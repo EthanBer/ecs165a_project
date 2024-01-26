@@ -1,0 +1,16 @@
+Carlos and Emma:
+insert -- hardish (3 of them)
+drop -- easy
+create -- mostly done?
+
+Lewis:
+create_index (later)
+drop_index (later)
+
+Akilan:
+update -- hardish (3 of them)
+delete -- ??? (indirection flag, ..)
+
+Ethan:
+select -- ???
+sum -- ??? 
