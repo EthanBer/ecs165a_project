@@ -19,7 +19,7 @@ class Database():
     :param num_columns: int     #Number of Columns: all columns are integer
     :param key: int             #Index of table key in columns
     """
-    def create_table(self, name, num_columns, key_index):
+    def create_table(self, name : str, num_columns : int, key_index : int) -> Table:
         table = Table(name, num_columns, key_index)
         return table
 
