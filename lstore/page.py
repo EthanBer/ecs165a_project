@@ -1,26 +1,37 @@
 import struct
 
 class PageRange:
-    def __init__(self):
-        self.base_pages = []
-        self.tail_pages= []
-        
-        self.base_pages.append(Page())
-  
+    def __init__(self, num_columns: int):
+        self.base_pages: list[BasePage] = []
+        self.tail_pages: list[TailPage] = []
+        self.num_columns = num_columns
+        self.base_pages.append(BasePage(self, self.num_columns))
+        self.tail_pages.append(TailPage(self, self.num_columns))
 
 class Page:
-
-    def __init__(self):
+    def __init__(self, page_range: PageRange, num_columns: int):
         self.num_records = 0
-        self.physical_pages = []
-        # len(self.pages) == num_columns
+        self.physical_pages: list[PhysicalPage] = []
+        self.page_range = page_range
+        self.num_columns = num_columns
+        for _ in range(len(self.num_columns)):
+            page = PhysicalPage()
+            self.physical_pages.append(page)
+        # checking that all page sizes are the same:
+        # https://stackoverflow.com/questions/3844801/check-if-all-elements-in-a-list-are-identical
+        assert len(set(map(lambda physicalPage: physicalPage.size, self.physical_pages))) <= 1 
+        self.physical_page_size: int = self.physical_pages[0].size
+        # assert len(self.physical_pages) == num_columns
 
 
-    def has_capacity(self) -> bool:
+    def has_capacity(self, n=1) -> bool:
         #if self.num_records
-        pass
+        # checks if we have capacity for n more records
+        return (self.num_records * self.num_columns * 64) <= self.physical_page_size - (self.num_columns * 64 * n)
+        
     
-    def insert(self, *columns : list) -> int:
+    def insert(self, *columns : int) -> int:
+        # NOTE: should follow same format as records, should return RID of successful record
         print(columns,"\n")
 
         if (self.num_records == 0):
@@ -41,11 +52,22 @@ class Page:
     def update():
         pass
 
-    def get_nth_record(self, n):
-        # get nth record of this page
-        pass
+    
+    def get_nth_record(self, record_idx: int) -> int:
+        # get record at idx n of this page
+        if record_idx == -1:
+            return self.physical_pages[-1][-1]
+        top_idx = record_idx // self.physical_page_size 
+        bottom_idx = record_idx % self.physical_page_size
+        return self.physical_pages[top_idx][bottom_idx]
 
+class BasePage(Page):
+    pass
 
+class TailPage(Page):
+    pass
+
+  
 class PhysicalPage:
     
     def __init__(self):

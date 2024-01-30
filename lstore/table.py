@@ -1,7 +1,7 @@
 from lstore.index import Index
 from time import time
 
-from lstore.page import PageRange
+from lstore.page import PageRange, Page
 
 
 INDIRECTION_COLUMN = 0
@@ -25,6 +25,11 @@ class Record:
 
 
 
+    def __getitem__(self, key: int) -> list[int]:
+        # this syntax is used in the increment() function of query.py, so this operator should be implemented
+        return self.columns[key]
+
+
 class Table:
 
     """
@@ -32,15 +37,17 @@ class Table:
     :param num_columns: int     #Number of Columns: all columns are integer
     :param key: int             #Index of table key in columns
     """
-    def __init__(self, name, num_columns, key):
-        self.name = name
-        self.key = key
-        self.num_columns = num_columns
-        self.page_directory = {}
+    def __init__(self, name: str, num_columns: int, key: int):
+        self.name: str = name
+        self.key: int = key
+        self.num_columns: int = num_columns
+        self.page_directory: dict[int, tuple[Page, int]] = {}
+        # Page Directory:
+        # {Rid: (Page, offset)}
         self.index = Index(self)
         
         self.page_ranges = []
-        self.page_ranges.append(PageRange())
+        self.page_ranges.append(PageRange(self.num_columns))
 
 
 
