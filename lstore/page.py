@@ -1,7 +1,4 @@
-
-# class BasePage(Page):
-#     ...
-
+import struct
 
 class PageRange:
     def __init__(self):
@@ -24,6 +21,8 @@ class Page:
         pass
     
     def insert(self, *columns : list) -> int:
+        print(columns,"\n")
+
         if (self.num_records == 0):
             for i in range(len(columns)):
                 page = PhysicalPage()
@@ -56,8 +55,14 @@ class PhysicalPage:
         self.offset = 0
 
     def insert(self, value):
-        #self.data[self.offset] = value
-        self.data.append(value)
+        
+        #value = int(value)
+        #self.data.append(value)
+
+        # Pack the 64-bit integer into bytes (using 'Q' format for unsigned long long)
+        packed_data = struct.pack('Q', value)
+        # Append the packed bytes to the bytearray
+        self.data[:len(packed_data)] = packed_data
         self.offset += 64
 
 

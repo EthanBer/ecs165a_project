@@ -3,8 +3,9 @@ from time import time
 
 from lstore.page import PageRange
 
+
 INDIRECTION_COLUMN = 0
-RID_COLUMN = 1
+RID_COLUMN= 1
 TIMESTAMP_COLUMN = 2
 SCHEMA_ENCODING_COLUMN = 3
 
@@ -12,10 +13,12 @@ SCHEMA_ENCODING_COLUMN = 3
 class Record:
 
     def __init__(self, key, indirection_column, schema_encoding, columns):
+        global RID_COLUMN
+
         self.rid = RID_COLUMN
         self.key = key
         self.schema_encoding = schema_encoding
-        self.indirection_column = 
+        self.indirection_column = indirection_column
         self.columns = columns
         RID_COLUMN += 1
 

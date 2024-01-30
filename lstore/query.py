@@ -1,6 +1,7 @@
 from lstore.table import Table, Record
 from lstore.index import Index
 
+from lstore.page import PageRange, Page
 
 class Query:
     """
@@ -29,12 +30,32 @@ class Query:
     # Return True upon succesful insertion
     # Returns False if insert fails for whatever reason
     """
-    def insert(self, *columns):
-        schema_encoding = '0' * self.table.num_columns
+    def insert(self, *columns : list):
+        schema_encoding = 0
         # make a new record (Record class)
         # Page Directory:
         # {Rid: (Page, offset)}
-        pass
+
+        record = Record(columns[0], -1, schema_encoding, columns[1:])
+        # Transform columns to a list to append the schema encoding and the indirection column
+        list_columns = list(columns)
+        list_columns.append(schema_encoding)
+        list_columns.append(0)
+        columns = tuple(list_columns)
+        
+        if len(self.table.page_directory) == 0:
+            page = Page()
+            self.table.page_ranges[0].base_pages.append(page)
+            
+        elif not self.table.page_ranges[-1].base_pages[-1].has_capacity():
+            page = Page()
+            self.table.page_ranges[-1].base_pages.append(page)
+            print("he creado una pagina hijo de puta")
+        
+        self.table.page_directory[record.rid]=[page,page.num_records]
+        self.table.page_ranges[-1].base_pages[-1].insert(*columns)
+
+        return True
 
     
     """
