@@ -36,13 +36,6 @@ class Query:
         # Page Directory:
         # {Rid: (Page, offset)}
 
-        record = Record(columns[0], -1, schema_encoding, columns[1:])
-        # Transform columns to a list to append the schema encoding and the indirection column
-        list_columns = list(columns)
-        list_columns.append(schema_encoding)
-        list_columns.append(0)
-        columns = tuple(list_columns)
-        
         if len(self.table.page_directory) == 0:
             page = Page(self.table.page_ranges[0], self.table.num_columns)
             self.table.page_ranges[0].base_pages.append(page)
@@ -50,10 +43,9 @@ class Query:
         elif not self.table.page_ranges[-1].base_pages[-1].has_capacity():
             page = Page(self.table.page_ranges[-1], self.table.num_columns)
             self.table.page_ranges[-1].base_pages.append(page)
-            print("he creado una pagina hijo de puta")
-        
-        self.table.page_directory[record.rid]=[page,page.num_records]
-        self.table.page_ranges[-1].base_pages[-1].insert(*columns)
+
+        rid = self.table.page_ranges[-1].base_pages[-1].insert(schema_encoding, -1, *columns)
+        self.table.page_directory[rid]=[page, page.num_records]
 
         return True
 

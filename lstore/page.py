@@ -1,4 +1,5 @@
 import struct
+from lstore.table import Record
 
 class PageRange:
     def __init__(self, num_columns: int):
@@ -14,9 +15,10 @@ class Page:
         self.physical_pages: list[PhysicalPage] = []
         self.page_range = page_range
         self.num_columns = num_columns
-        for _ in range(len(self.num_columns)):
+        for _ in range(self.num_columns):
             page = PhysicalPage()
             self.physical_pages.append(page)
+        
         # checking that all page sizes are the same:
         # https://stackoverflow.com/questions/3844801/check-if-all-elements-in-a-list-are-identical
         assert len(set(map(lambda physicalPage: physicalPage.size, self.physical_pages))) <= 1 
@@ -28,28 +30,33 @@ class Page:
         #if self.num_records
         # checks if we have capacity for n more records
         return (self.num_records * self.num_columns * 64) <= self.physical_page_size - (self.num_columns * 64 * n)
-        
     
-    def insert(self, *columns : int) -> int:
-        # NOTE: should follow same format as records, should return RID of successful record
-        print(columns,"\n")
 
-        if (self.num_records == 0):
-            for i in range(len(columns)):
-                page = PhysicalPage()
-                self.physical_pages.append(page)
-        else:
-            if (self.has_capacity == False):
-                return -1
+    # Returns -1 if there is no capacity in the page
+    def insert(self, schema_encoding, indirection_column, *columns : int) -> int:
+        # NOTE: should follow same format as records, should return RID of successful record
+
+        record = Record(columns[0], indirection_column, schema_encoding, columns[1:])
+        
+        # Transform columns to a list to append the schema encoding and the indirection column
+        list_columns = list(columns)
+        list_columns.append(schema_encoding)
+        list_columns.append(0)
+        columns = tuple(list_columns)
+
+
+        if (self.has_capacity == False):
+            return -1
         
         for i in range(len(columns)):
             self.physical_pages[i].insert(columns[i])
         
         self.num_records += 1
+
         return 0
 
 
-    def update():
+    def update(self):
         pass
 
     
