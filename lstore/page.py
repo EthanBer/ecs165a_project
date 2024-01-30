@@ -44,7 +44,6 @@ class Page:
         list_columns.append(0)
         columns = tuple(list_columns)
 
-
         if (self.has_capacity == False):
             return -1
         
@@ -53,7 +52,7 @@ class Page:
         
         self.num_records += 1
 
-        return 0
+        return record.rid
 
 
     def update(self):
@@ -67,6 +66,7 @@ class Page:
         top_idx = record_idx // self.physical_page_size 
         bottom_idx = record_idx % self.physical_page_size
         return self.physical_pages[top_idx][bottom_idx]
+
 
 class BasePage(Page):
     pass
