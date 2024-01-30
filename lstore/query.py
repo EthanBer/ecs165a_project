@@ -92,27 +92,31 @@ class Query:
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
     def update(self, primary_key: int, *columns: int) -> bool:
+        assert len(columns) == self.table.num_columns, "len(columns) must be equal to number of columsn in table"
         if len(columns) != self.table.num_columns: return False
         INDIRECTION_COLUMN = 0
         RID_COLUMN = 1
-        base_record = self.select(primary_key, self.table.key, [1, 1] + ([0] * (len(columns) - 2)))[0] # select indirection and rid columns
+        primary_key_matches = self.select(primary_key, self.table.key, [1, 1] + ([0] * (len(columns) - 2)))
+        if len(primary_key_matches) == 0:
+            return False
+        assert len(primary_key_matches) == 1
+        base_record = primary_key_matches[0] # select indirection and rid columns
         page_range = self.table.page_directory[base_record[RID_COLUMN]][0].page_range
         tail_page = page_range.tail_pages[-1]
-        last_update_rid = tail_page.get_nth_record(-1).rid
         first_update = False
-        tail_1_values = [None] * len(columns) # will set the key to none, wherever it is
-        tail_1_indirection = base_record[RID_COLUMN]
+        tail_1_values = tail_1_indirection = tail_1_schema_encoding = None
         # the first bit is a flag, specifying whether this tail record is a snapshot of original base page values or an updated value
-        tail_1_schema_encoding = 1 << self.table.num_columns #..for now. we also need to take into account which columns were updated 
         new_record_values = []
 
         if base_record[INDIRECTION_COLUMN] == None: # this record hasn't been updated before
             first_update = True
+            tail_1_values = [None] * len(columns) # will set the key to none, wherever it is
+            tail_1_indirection = base_record[RID_COLUMN]
+            tail_1_schema_encoding = 1 << self.table.num_columns #..for now. we also need to take into account which columns were updated 
             # new_record_values.append([])
             # ... put tail record 
         tail_indirection = base_record[RID_COLUMN]
         tail_schema_encoding = 0 #..for now. we need to take into account updated columns
-        tail_values = [None] * len(columns)
         if not tail_page.has_capacity(2 if first_update else 1):
             tail_page = TailPage(page_range, page_range.num_columns)
             page_range.append(tail_page)
@@ -124,11 +128,18 @@ class Query:
                 if first_update:
                     tail_1_values[i] = column
                     tail_1_schema_encoding |= (1 << i)
-                tail_values[i] = column
                 tail_schema_encoding |= (1 << i)
+        last_update_rid = None
         if first_update:
-            # rid = tail_page.insert(tail_1_indirection, tail_1_schema_encoding, tail_1_values)
+            last_update_rid = tail_page.insert(tail_1_indirection, tail_1_schema_encoding, tail_1_values)
             pass
+        else:
+            last_update_rid = tail_page.get_nth_record(-1).rid
+
+        tail_page.insert(last_update_rid, tail_1_schema_encoding, updated_columns)
+        return True
+
+
         # tail_1_indirection = rid if first_update else last_update_rid
 
 
