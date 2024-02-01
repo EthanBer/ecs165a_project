@@ -40,7 +40,7 @@ class Page:
 
     # Returns -1 if there is no capacity in the page
 
-    def insert(self, schema_encoding, indirection_column, *columns: list[int | None]) -> int:
+    def insert(self, schema_encoding: int, indirection_column: int, *columns: int | None) -> int:
         # NOTE: should follow same format as records, should return RID of successful record
 
         record = Record(columns[0], indirection_column,
@@ -65,7 +65,7 @@ class Page:
     def update(self):
         pass
 
-    def get_nth_record(self, record_idx: int) -> int:
+    def get_nth_record(self, record_idx: int) -> Record:
         # get record at idx n of this page
         if record_idx == -1:
             # return self.physical_pages[-1][-1]
@@ -73,14 +73,6 @@ class Page:
         top_idx = record_idx // self.physical_page_size
         bottom_idx = record_idx % self.physical_page_size
         return self.physical_pages[top_idx][bottom_idx]
-
-
-class BasePage(Page):
-    pass
-
-
-class TailPage(Page):
-    pass
 
 
 class PhysicalPage:

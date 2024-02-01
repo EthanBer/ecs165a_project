@@ -1,7 +1,7 @@
 from lstore.table import Table, Record
 from lstore.index import Index
 from lstore.page import Page
-from lstore.base_tail_page import TailPage
+from lstore.base_tail_page import BasePage, TailPage
 
 
 class Query:
@@ -32,7 +32,7 @@ class Query:
     # Returns False if insert fails for whatever reason
     """
 
-    def insert(self, *columns: int) -> bool:
+    def insert(self, *columns: list[int | None]) -> bool:
         schema_encoding = 0
 
         if len(self.table.page_directory) == 0:
@@ -98,7 +98,7 @@ class Query:
         assert len(primary_key_matches) == 1
         # select indirection and rid columns
         base_record = primary_key_matches[0]
-        page_range = self.table.page_directory[base_record.rid][0].page_range
+        page_range = self.table.page_directory[base_record.rid]["page"].page_range
         tail_page = page_range.tail_pages[-1]
         first_update = False
         tail_1_values: list[int | None] = []
@@ -141,8 +141,8 @@ class Query:
                 last_update_page_dir_entry = self.table.page_directory[last_update_rid]
             else:
                 assert False, "brh"
-            prev_schema_encoding = last_update_page_dir_entry[0].get_nth_record(
-                last_update_page_dir_entry[1]).schema_encoding
+            prev_schema_encoding = last_update_page_dir_entry["page"].get_nth_record(
+                last_update_page_dir_entry["offset"]).schema_encoding
             tail_schema_encoding |= prev_schema_encoding
 
         tail_page.insert(tail_indirection,

@@ -1,5 +1,6 @@
 from lstore.index import Index
 from time import time
+from typing import TypedDict
 
 from lstore.page import PageRange, Page
 
@@ -39,7 +40,10 @@ class Table:
         self.name: str = name
         self.key: int = key
         self.num_columns: int = num_columns
-        self.page_directory: dict[int, tuple[Page, int]] = {}
+        class PageDirectoryEntry(TypedDict):
+            page: Page
+            offset: int
+        self.page_directory: dict[int, PageDirectoryEntry] = {}
         # Page Directory:
         # {Rid: (Page, offset)}
         self.index = Index(self)
