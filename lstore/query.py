@@ -32,24 +32,20 @@ class Query:
     # Returns False if insert fails for whatever reason
     """
 
-    def insert(self, *columns: int):
-        schema_encoding = '0' * self.table.num_columns
-        # should make a new RID
-        # make a new record (Record class)
-        # Page Directory:
-        # {Rid: (Page, offset)}
+    def insert(self, *columns: int) -> bool:
+        schema_encoding = 0
 
         if len(self.table.page_directory) == 0:
-            page = Page(self.table.page_ranges[0], self.table.num_columns)
+            page = BasePage(self.table.page_ranges[0], self.table.num_columns)
             self.table.page_ranges[0].base_pages.append(page)
 
         elif not self.table.page_ranges[-1].base_pages[-1].has_capacity():
-            page = Page(self.table.page_ranges[-1], self.table.num_columns)
+            page = BasePage(self.table.page_ranges[-1], self.table.num_columns)
             self.table.page_ranges[-1].base_pages.append(page)
 
         rid = self.table.page_ranges[-1].base_pages[-1].insert(
             schema_encoding, -1, *columns)
-        self.table.page_directory[rid] = [page, page.num_records]
+        self.table.page_directory[rid] = (page, page.num_records)
 
         return True
 
@@ -90,7 +86,7 @@ class Query:
 
     def update(self, primary_key: int, *columns: int) -> bool:
         assert len(
-            columns) == self.table.num_columns, "len(columns) must be equal to number of columsn in table"
+            columns) == self.table.num_columns, "len(columns) must be equal to number of columns in table"
         if len(columns) != self.table.num_columns:
             return False
         INDIRECTION_COLUMN = 0

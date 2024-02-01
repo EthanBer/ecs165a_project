@@ -60,17 +60,27 @@ class Page:
 
         self.num_records += 1
 
-        return 0
+        return record.rid
 
-    def get_nth_record(self, record_idx: int) -> Record:
-        # get record at idx n of this page. -1 returns last record
+    def update(self):
+        pass
+
+    def get_nth_record(self, record_idx: int) -> int:
+        # get record at idx n of this page
         if record_idx == -1:
             # return self.physical_pages[-1][-1]
             return Record()
         top_idx = record_idx // self.physical_page_size
         bottom_idx = record_idx % self.physical_page_size
-        # return self.physical_pages[top_idx][bottom_idx]
-        return Record()
+        return self.physical_pages[top_idx][bottom_idx]
+
+
+class BasePage(Page):
+    pass
+
+
+class TailPage(Page):
+    pass
 
 
 class PhysicalPage:
