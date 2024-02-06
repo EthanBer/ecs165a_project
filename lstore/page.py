@@ -1,16 +1,16 @@
 import struct
-from lstore.base_tail_page import BasePage, TailPage
+#from lstore.base_tail_page import BasePage, TailPage
 
 from lstore.table import Record
 
 
 class PageRange:
     def __init__(self, num_columns: int):
-        self.base_pages: list[BasePage] = []
-        self.tail_pages: list[TailPage] = []
+        self.base_pages = []
+        self.tail_pages = []
         self.num_columns = num_columns
-        self.base_pages.append(BasePage(self, self.num_columns))
-        self.tail_pages.append(TailPage(self, self.num_columns))
+        self.base_pages.append(Page(self, self.num_columns))
+        self.tail_pages.append(Page(self, self.num_columns))
 
     def append_tail_page(self, tail_page: TailPage):
         self.tail_pages.append(tail_page)
@@ -40,7 +40,7 @@ class Page:
 
     # Returns -1 if there is no capacity in the page
 
-    def insert(self, schema_encoding: int, indirection_column: int, *columns: int | None) -> int:
+    def insert(self, schema_encoding, indirection_column, *columns: list[int | None]|int) -> int:
         # NOTE: should follow same format as records, should return RID of successful record
 
         record = Record(columns[0], indirection_column,
@@ -68,11 +68,24 @@ class Page:
     def get_nth_record(self, record_idx: int) -> Record:
         # get record at idx n of this page
         if record_idx == -1:
-            # return self.physical_pages[-1][-1]
-            return Record()
+            return self.physical_pages[-1].data[-4:]
+            #return Record()
         top_idx = record_idx // self.physical_page_size
         bottom_idx = record_idx % self.physical_page_size
-        return self.physical_pages[top_idx][bottom_idx]
+        return self.physical_pages[top_idx].__get_nth_record__(bottom_idx)
+
+
+
+class BasePage(Page):
+    pass
+
+
+class TailPage(Page):
+    pass
+
+
+
+
 
 
 class PhysicalPage:
@@ -84,12 +97,16 @@ class PhysicalPage:
         self.offset = 0
 
     def insert(self, value):
-
-        # value = int(value)
-        # self.data.append(value)
-
         # Pack the 64-bit integer into bytes (using 'Q' format for unsigned long long)
         packed_data = struct.pack('Q', value)
         # Append the packed bytes to the bytearray
         self.data[:len(packed_data)] = packed_data
         self.offset += 64
+
+
+    def __get_nth_record__(self, record_idx: int):
+        if record_idx == -1:
+            return self.data[-4:]
+            #return Record()
+        return self.data[record_idx:record_idx+4]
+
