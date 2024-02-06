@@ -32,7 +32,7 @@ class Query:
     # Returns False if insert fails for whatever reason
     """
 
-    def insert(self, *columns: list[int | None]) -> bool:
+    def insert(self, *columns: int | None) -> bool:
         schema_encoding = 0
 
         if len(self.table.page_directory) == 0:
@@ -46,6 +46,9 @@ class Query:
         rid = self.table.page_ranges[-1].base_pages[-1].insert(
             schema_encoding, -1, *columns)
         self.table.page_directory[rid] = (page, page.num_records)
+
+        self.table.index.update_index()
+        # self
 
         return True
 
@@ -89,8 +92,6 @@ class Query:
             columns) == self.table.num_columns, "len(columns) must be equal to number of columns in table"
         if len(columns) != self.table.num_columns:
             return False
-        INDIRECTION_COLUMN = 0
-        RID_COLUMN = 1
         primary_key_matches = self.select(primary_key, self.table.key, [
                                           1, 1] + ([0] * (len(columns) - 2)))
         if len(primary_key_matches) == 0:

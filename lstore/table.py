@@ -7,13 +7,12 @@ from lstore.page import PageRange, Page
 
 INDIRECTION_COLUMN = 0
 RID_COLUMN = 1
-TIMESTAMP_COLUMN = 2
-SCHEMA_ENCODING_COLUMN = 3
+SCHEMA_ENCODING_COLUMN = 2
 
 
 class Record:
 
-    def __init__(self, key, indirection_column, schema_encoding, columns):
+    def __init__(self, key: int, indirection_column: int, schema_encoding: int, *columns: int):
         global RID_COLUMN
 
         self.rid = RID_COLUMN
@@ -51,6 +50,6 @@ class Table:
         self.page_ranges: list[PageRange] = []
         self.page_ranges.append(PageRange(self.num_columns))
 
-    def __merge(self):
-        print("merge is happening")
-        pass
+    # def __merge(self):
+    #     print("merge is happening")
+    #     pass
