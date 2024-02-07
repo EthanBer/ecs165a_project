@@ -1,18 +1,22 @@
 import struct
-#from lstore.base_tail_page import BasePage, TailPage
+from lstore.base_tail_page import BasePage, TailPage
 
 from lstore.table import Record
+from lstore.config import config
+from lstore.ColumnIndex import RawIndex, DataIndex
 
+global last_rid
+last_rid = 0
 
 class PageRange:
     def __init__(self, num_columns: int):
-        self.base_pages = []
-        self.tail_pages = []
+        self.base_pages: list[BasePage] = []
+        self.tail_pages: list[TailPage] = []
         self.num_columns = num_columns
-        self.base_pages.append(Page(self, self.num_columns))
-        self.tail_pages.append(Page(self, self.num_columns))
+        self.base_pages.append(BasePage(self, self.num_columns))
+        self.tail_pages.append(TailPage(self, self.num_columns))
 
-    def append_tail_page(self, tail_page: TailPage):
+    def append_tail_page(self, tail_page: TailPage) -> None:
         self.tail_pages.append(tail_page)
 
 
@@ -33,23 +37,24 @@ class Page:
         self.physical_page_size: int = self.physical_pages[0].size
         # assert len(self.physical_pages) == num_columns
 
-    def has_capacity(self, n=1) -> bool:
+    def has_capacity(self, n: int=1) -> bool:
         # if self.num_records
         # checks if we have capacity for n more records
         return (self.num_records * self.num_columns * 64) <= self.physical_page_size - (self.num_columns * 64 * n)
 
+
     # Returns -1 if there is no capacity in the page
-
-    def insert(self, schema_encoding, indirection_column, *columns: list[int | None]|int) -> int:
+    def insert(self, schema_encoding: int, indirection_column: int, key:int, *columns: int) -> int:
         # NOTE: should follow same format as records, should return RID of successful record
-
-        record = Record(columns[0], indirection_column,
-                        schema_encoding, columns[1:])
+        record = Record(indirection_column, last_rid, schema_encoding, key, *columns)
 
         # Transform columns to a list to append the schema encoding and the indirection column
         list_columns = list(columns)
-        list_columns.append(schema_encoding)
-        list_columns.append(0)
+        list_columns.insert(config.INDIRECTION_COLUMN, indirection_column)
+        # list_columns.insert(config.TIMESTAMP_COLUMN, timestamp)    uncomment for next milestone
+        list_columns.insert(config.RID_COLUMN, last_rid)
+        list_columns.insert(config.SCHEMA_ENCODING_COLUMN, schema_encoding)
+        list_columns.insert(config.KEY_COLUMN, key)
         columns = tuple(list_columns)
 
         if (self.has_capacity == False):
@@ -59,29 +64,32 @@ class Page:
             self.physical_pages[i].insert(columns[i])
 
         self.num_records += 1
+        last_rid += 1
 
         return record.rid
 
-    def update(self):
-        pass
+    # def update(self):
+    #     pass
 
-    def get_nth_record(self, record_idx: int) -> Record:
+
+    def get_nth_record(self, record_idx: DataIndex) -> Record:
         # get record at idx n of this page
         if record_idx == -1:
-            return self.physical_pages[-1].data[-4:]
-            #return Record()
+            return self.physical_pages[-1].data[-8:]
+        
         top_idx = record_idx // self.physical_page_size
         bottom_idx = record_idx % self.physical_page_size
-        return self.physical_pages[top_idx].__get_nth_record__(bottom_idx)
 
+        indirection_column = self.physical_pages[config.INDIRECTION_COLUMN].__get_nth_record__(record_idx)
+        rid = self.physical_pages[config.RID_COLUMN].__get_nth_record__(record_idx)
+        schema_encoding = self.physical_pages[config.SCHEMA_ENCODING_COLUMN].__get_nth_record__(record_idx)
+        key = self.physical_pages[config.KEY_COLUMN].__get_nth_record__(record_idx)
 
-
-class BasePage(Page):
-    pass
-
-
-class TailPage(Page):
-    pass
+        columns = []
+        for i in range(4, 4 + self.num_columns):
+            columns.append(self.physical_pages[i].__get_nth_record__(record_idx))
+        
+        return Record(indirection_column, rid, schema_encoding, key, *columns)
 
 
 
@@ -90,13 +98,13 @@ class TailPage(Page):
 
 class PhysicalPage:
 
-    def __init__(self):
+    def __init__(self) -> None:
         # self.size = 8192
         self.size = 4096
         self.data = bytearray(self.size)
         self.offset = 0
 
-    def insert(self, value):
+    def insert(self, value: int) -> None:
         # Pack the 64-bit integer into bytes (using 'Q' format for unsigned long long)
         packed_data = struct.pack('Q', value)
         # Append the packed bytes to the bytearray
@@ -104,9 +112,10 @@ class PhysicalPage:
         self.offset += 64
 
 
-    def __get_nth_record__(self, record_idx: int):
+    def __get_nth_record__(self, record_idx: int) -> int:
         if record_idx == -1:
-            return self.data[-4:]
-            #return Record()
-        return self.data[record_idx:record_idx+4]
+            return int.from_bytes(self.data[-8:], 'big')    # endianess = 'big'
+    
+        record_data=self.data[8*record_idx:8*record_idx+8]
+        return int.from_bytes(record_data, 'big')
 

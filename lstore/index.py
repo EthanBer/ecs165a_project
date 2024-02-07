@@ -2,13 +2,17 @@
 A data strucutre holding indices for various columns of a table. Key column should be indexd by default, other columns can be indexed through this object. Indices are usually B-Trees, but other data structures can be used as well.
 """
 
+from lstore.table import Table
+
+
 class Index:
 
-    def __init__(self, table):
+    def __init__(self, table: Table):
         # One index for each table. All our empty initially.
         self.indices = [None] *  table.num_columns
         pass
 
+    """
     """
     # returns the location of all records with the given value on column "column"
     """
@@ -36,3 +40,4 @@ class Index:
 
     def drop_index(self, column_number):
         pass
+    """
