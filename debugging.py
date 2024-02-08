@@ -66,6 +66,7 @@ if __name__ == "__main__":
             key = 92106429 + randint(0, number_of_records)
 
         records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
+        print("hiii")
         query.insert(*records[key])
         # print('inserted', records[key])
     print("Insert finished")

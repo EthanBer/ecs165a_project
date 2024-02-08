@@ -23,7 +23,7 @@ class Query:
     # Return False if record doesn't exist or is locked due to 2PL
     """
 
-    def delete(self, primary_key):
+    def delete(self, primary_key: int):
         pass
 
     """
@@ -36,11 +36,11 @@ class Query:
         schema_encoding = 0
 
         if len(self.table.page_directory) == 0:
-            page = BasePage(self.table.page_ranges[0], self.table.num_columns)
+            page = BasePage(self.table.num_columns)
             self.table.page_ranges[0].base_pages.append(page)
 
         elif not self.table.page_ranges[-1].base_pages[-1].has_capacity():
-            page = BasePage(self.table.page_ranges[-1], self.table.num_columns)
+            page = BasePage(self.table.num_columns)
             self.table.page_ranges[-1].base_pages.append(page)
 
         rid = self.table.page_ranges[-1].base_pages[-1].insert(
@@ -142,8 +142,11 @@ class Query:
                 last_update_page_dir_entry = self.table.page_directory[last_update_rid]
             else:
                 assert False, "brh"
-            prev_schema_encoding = last_update_page_dir_entry["page"].get_nth_record(
-                last_update_page_dir_entry["offset"]).schema_encoding
+
+            prev_schema_encoding = get_record_by_rid(last_update_rid)
+
+            # prev_schema_encoding = last_update_page_dir_entry["page"].get_nth_record(
+            #     last_update_page_dir_entry["offset"]).schema_encoding
             tail_schema_encoding |= prev_schema_encoding
 
         tail_page.insert(tail_indirection,

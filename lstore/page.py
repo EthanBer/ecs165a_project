@@ -1,26 +1,14 @@
-import struct
-from lstore.base_tail_page import BasePage, TailPage
+from typing import NewType
+from lstore.record_physical_page import Record, PhysicalPage
 
-from lstore.table import Record
-
-
-class PageRange:
-    def __init__(self, num_columns: int):
-        self.base_pages: list[BasePage] = []
-        self.tail_pages: list[TailPage] = []
-        self.num_columns = num_columns
-        self.base_pages.append(BasePage(self, self.num_columns))
-        self.tail_pages.append(TailPage(self, self.num_columns))
-
-    def append_tail_page(self, tail_page: TailPage) -> None:
-        self.tail_pages.append(tail_page)
-
+DataPositionIndex = NewType('DataPositionIndex', int)
+RawPositionIndex = NewType('RawPositionIndex', int)
 
 class Page:
-    def __init__(self, page_range: PageRange, num_columns: int):
+    def __init__(self, num_columns: int):
         self.num_records = 0
         self.physical_pages: list[PhysicalPage] = []
-        self.page_range = page_range
+        # self.page_range = page_range
         self.num_columns = num_columns
         for _ in range(self.num_columns):
             page = PhysicalPage()
@@ -43,13 +31,16 @@ class Page:
     def insert(self, schema_encoding: int, indirection_column: int, *columns: int) -> int:
         # NOTE: should follow same format as records, should return RID of successful record
 
+        print("hi")
         record = Record(columns[0], indirection_column,
                         schema_encoding, *columns[1:])
 
         # Transform columns to a list to append the schema encoding and the indirection column
+        print(columns)
         list_columns = list(columns)
         list_columns.append(schema_encoding)
         list_columns.append(0)
+        columns = tuple([indirection_column, ])
         columns = tuple(list_columns)
 
         if (self.has_capacity == False):
@@ -65,7 +56,9 @@ class Page:
     # def update(self):
     #     pass
 
+    # def get_nth_record(self, record:)
     # def get_nth_record(self, record_idx: int) -> Record:
+    #     pass
     #     pass
         # # get record at idx n of this page
         # if record_idx == -1:
@@ -76,33 +69,4 @@ class Page:
         # return Record(self.table.key)
         # return self.physical_pages[top_idx].__get_nth_record__(bottom_idx)
 
-
-
-
-
-
-
-
-
-class PhysicalPage:
-
-    def __init__(self) -> None:
-        # self.size = 8192
-        self.size = 4096
-        self.data = bytearray(self.size)
-        self.offset = 0
-
-    def insert(self, value: int) -> None:
-        # Pack the 64-bit integer into bytes (using 'Q' format for unsigned long long)
-        packed_data = struct.pack('Q', value)
-        # Append the packed bytes to the bytearray
-        self.data[:len(packed_data)] = packed_data
-        self.offset += 64
-
-
-    def __get_nth_record__(self, record_idx: int) -> int:
-        if record_idx == -1:
-            return int(self.data[-4:])
-            #return Record()
-        return int(self.data[record_idx:record_idx+4])
 

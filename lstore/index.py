@@ -4,7 +4,6 @@ A data strucutre holding indices for various columns of a table. Key column shou
 
 from lstore.table import Table
 
-
 class Index:
 
     def __init__(self, table: Table):
@@ -41,3 +40,5 @@ class Index:
     def drop_index(self, column_number):
         pass
     """
+
+# from lstore.table import Table

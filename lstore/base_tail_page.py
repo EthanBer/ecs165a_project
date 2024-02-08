@@ -1,10 +1,10 @@
 
-from lstore.page import Page
-
-
-class BasePage(Page):
-    pass
+from lstore.page import Page, PhysicalPage
 
 
 class TailPage(Page):
     pass
+
+class BasePage(Page):
+    pass
+

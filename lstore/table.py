@@ -1,30 +1,14 @@
-from lstore.index import Index
 from time import time
 from typing import TypedDict
 
-from lstore.page import PageRange, Page
+from lstore.page_range import PageRange
+from lstore.page import Page
+from lstore.record_physical_page import Record
 
 
 INDIRECTION_COLUMN = 0
 RID_COLUMN = 1
 SCHEMA_ENCODING_COLUMN = 2
-
-
-class Record:
-
-    def __init__(self, key: int, indirection_column: int, schema_encoding: int, *columns: int):
-        global RID_COLUMN
-
-        self.rid = RID_COLUMN
-        self.key = key
-        self.schema_encoding = schema_encoding
-        self.indirection_column = indirection_column
-        self.columns = columns
-        RID_COLUMN += 1
-
-    def __getitem__(self, key: int) -> int:
-        # this syntax is used in the increment() function of query.py, so this operator should be implemented
-        return self.columns[key]
 
 
 class Table:
@@ -45,11 +29,16 @@ class Table:
         self.page_directory: dict[int, PageDirectoryEntry] = {}
         # Page Directory:
         # {Rid: (Page, offset)}
+        from lstore.index import Index
         self.index = Index(self)
 
         self.page_ranges: list[PageRange] = []
         self.page_ranges.append(PageRange(self.num_columns))
 
+    def get_record_by_rid(self, rid: int) -> Record:
+        page_dir_entry = self.page_directory[rid]
+        return page_dir_entry["page"].get_nth_record(
+                page_dir_entry["offset"])
     # def __merge(self):
     #     print("merge is happening")
     #     pass
