@@ -1,14 +1,16 @@
 from typing import NewType
-from lstore.record_physical_page import Record, PhysicalPage
 
+from lstore.record_physical_page import Record, PhysicalPage
 from lstore.table import Record
+
 from lstore.config import config
 from lstore.ColumnIndex import RawIndex, DataIndex
 
 global last_rid
 last_rid = 0
 
-class PageRange:
+
+class Page:
     def __init__(self, num_columns: int):
         self.num_records = 0
         self.physical_pages: list[PhysicalPage] = []
@@ -79,32 +81,3 @@ class PageRange:
             columns.append(self.physical_pages[i].__get_nth_record__(record_idx))
         
         return Record(indirection_column, rid, schema_encoding, key, *columns)
-
-
-
-
-
-
-class PhysicalPage:
-
-    def __init__(self) -> None:
-        # self.size = 8192
-        self.size = 4096
-        self.data = bytearray(self.size)
-        self.offset = 0
-
-    def insert(self, value: int) -> None:
-        # Pack the 64-bit integer into bytes (using 'Q' format for unsigned long long)
-        packed_data = struct.pack('Q', value)
-        # Append the packed bytes to the bytearray
-        self.data[:len(packed_data)] = packed_data
-        self.offset += 64
-
-
-    def __get_nth_record__(self, record_idx: int) -> int:
-        if record_idx == -1:
-            return int.from_bytes(self.data[-8:], 'big')    # endianess = 'big'
-    
-        record_data=self.data[8*record_idx:8*record_idx+8]
-        return int.from_bytes(record_data, 'big')
-

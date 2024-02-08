@@ -1,4 +1,5 @@
-from lstore.base_tail_page import BasePage, TailPage
+from lstore.base_tail_page import BasePage, TailPageç
+
 class PageRange:
     def __init__(self, num_columns: int):
         self.base_pages: list[BasePage] = []
