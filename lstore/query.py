@@ -44,12 +44,10 @@ class Query:
             self.table.page_ranges[-1].base_pages.append(page)
 
         rid = self.table.page_ranges[-1].base_pages[-1].insert(
-            schema_encoding, -1, *columns)
+            schema_encoding, -1, self.table.key, *columns)
         self.table.page_directory[rid] = (page, page.num_records)
 
         self.table.index.update_index()
-        # self
-
         return True
 
     """
