@@ -3,13 +3,14 @@ import random
 from lstore.record_physical_page import Record, PhysicalPage, DataIndex, RawIndex
 from lstore.config import config
 
-global last_rid
-last_rid = 1
+
+
 
 
 class Page:
+    #global last_rid
+    last_rid = 1
     def __init__(self, num_columns: int, key_index : DataIndex):
-
         self.key_index = key_index
         self.id = random.randrange(1, int(1e10))    # This ID is just for debugging purposes
 
@@ -52,16 +53,16 @@ class Page:
     # Returns -1 if there is no capacity in the page
     def insert(self, timestamp: int, schema_encoding: int, indirection_column: int, key:int, *columns: int | None) -> int:
         # NOTE: should follow same format as records, should return RID of successful record
-        last_rid = 0
-        record = Record(indirection_column, last_rid, schema_encoding, key, *columns)
+        record = Record(indirection_column, Page.last_rid, schema_encoding, key, *columns)
 
         # Transform columns to a list to append the schema encoding and the indirection column
         print(columns)
         list_columns = list(columns)
         list_columns.insert(config.INDIRECTION_COLUMN, indirection_column)
-        list_columns.insert(config.RID_COLUMN, last_rid)
+        list_columns.insert(config.RID_COLUMN, Page.last_rid)
         list_columns.insert(config.TIMESTAMP_COLUMN, timestamp)
         list_columns.insert(config.SCHEMA_ENCODING_COLUMN, schema_encoding)
+        list_columns.insert(config.NULL_COLUMN, 0)
         columns = tuple(list_columns)
         print("COLUMNS with metadata")
         print(columns)
@@ -73,7 +74,7 @@ class Page:
             self.physical_pages[i].insert(columns[i])
 
         self.num_records += 1
-        last_rid += 1
+        Page.last_rid += 1
 
         return record.rid
 

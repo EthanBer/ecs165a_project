@@ -32,7 +32,6 @@ class Query:
         records = self.select(primary_key, self.table.key_index, projected_columns_index)
         record = records[0]
 
-
         if (len(records) == 0):
             return False
         
@@ -40,22 +39,21 @@ class Query:
         page = tmp.page
         offset = tmp.offset
 
-        packed_data = struct.pack('Q', 0)
+        bitmask = 1 << (self.table.num_columns -1)
+        packed_data = struct.pack('>Q', bitmask)
         # Append the packed bytes to the bytearray
-        page.physical_pages[config.RID_COLUMN].data[offset*8:offset*8+8] = packed_data
-
-        indirection_column = int.from_bytes(page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8], 'big')
+        page.physical_pages[config.NULL_COLUMN].data[offset*8:offset*8+8] = packed_data
+        indirection_column = struct.unpack('>Q', page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]
 
         while indirection_column != 0:
             tmp = self.table.page_directory[indirection_column]
             page = tmp.page
             offset = tmp.offset
 
-            packed_data = struct.pack('Q', 0)
+            packed_data = struct.pack('>Q', bitmask)
             # Append the packed bytes to the bytearray
-            page.physical_pages[config.RID_COLUMN].data[offset*8:offset*8+8] = packed_data
-
-            indirection_column = int.from_bytes(page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8],'big')
+            page.physical_pages[config.NULL_COLUMN].data[offset*8:offset*8+8] = packed_data
+            indirection_column = struct.unpack('>Q', page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]
 
         return True
         

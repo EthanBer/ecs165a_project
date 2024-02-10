@@ -32,14 +32,11 @@ class PhysicalPage:
         # Append the packed bytes to the bytearray
         self.data[self.offset : self.offset+8] = packed_data
 
-        value = struct.unpack('>Q', self.data[self.offset:self.offset+8])[0]
-        print("Value: ", value)
-
         self.offset += 8
 
     def __get_nth_record__(self, record_idx: int) -> int:
         if record_idx == -1:
-            return int(self.data[-4:])
+            return int(self.data[-8:])
             #return Record()
         
         num_records = self.offset / 8
