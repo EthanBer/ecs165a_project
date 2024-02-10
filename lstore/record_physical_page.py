@@ -23,7 +23,7 @@ class PhysicalPage:
         self.data = bytearray(self.size)
         self.offset = 0
 
-    def insert(self, value: int) -> None:
+    def insert(self, value: int | None) -> None:
         # Pack the 64-bit integer into bytes (using '>Q' format for unsigned long long with big endian)
         packed_data = struct.pack('>Q', value)
         if self.offset + 8 > len(self.data):
