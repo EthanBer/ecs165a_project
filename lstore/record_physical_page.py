@@ -4,7 +4,7 @@ from typing import NewType
 from lstore.ColumnIndex import DataIndex, RawIndex
 
 class Record:
-    def __init__(self, indirection_column: int, rid :int, schema_encoding: int, key : DataIndex, *columns : int):
+    def __init__(self, indirection_column: int, rid :int, schema_encoding: int, key: int, *columns : int):
         self.rid = rid
         self.key = key
         self.schema_encoding = schema_encoding

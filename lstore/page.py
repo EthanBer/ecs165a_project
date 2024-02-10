@@ -15,7 +15,7 @@ class Page:
         self.physical_pages: list[PhysicalPage] = []
         # self.page_range = page_range
         self.num_columns = num_columns
-        for _ in range(self.num_columns):
+        for _ in range(self.num_columns + config.NUM_METADATA_COL):
             page = PhysicalPage()
             self.physical_pages.append(page)
 
@@ -63,17 +63,15 @@ class Page:
     #     pass
 
 
-    def get_nth_record(self, record_idx: DataIndex) -> Record:
+    def get_nth_record(self, record_idx: int) -> Record:
         # get record at idx n of this page
-        if record_idx == -1:
-            return self.physical_pages[-1].data[-8:]
-
         indirection_column = self.physical_pages[config.INDIRECTION_COLUMN].__get_nth_record__(record_idx)
         rid = self.physical_pages[config.RID_COLUMN].__get_nth_record__(record_idx)
         schema_encoding = self.physical_pages[config.SCHEMA_ENCODING_COLUMN].__get_nth_record__(record_idx)
+        key_col = self.physical_pages[self.key].__get_nth_record__(record_idx)
         
         columns = []
-        for i in range(3, 3 + self.num_columns):
+        for i in range(config.NUM_METADATA_COL, config.NUM_METADATA_COL + self.num_columns):
             columns.append(self.physical_pages[i].__get_nth_record__(record_idx))
         
         return Record(indirection_column, rid, schema_encoding, self.key, *columns)

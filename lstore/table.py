@@ -1,5 +1,6 @@
 from time import time
 from typing import TypedDict
+from lstore.ColumnIndex import DataIndex
 
 from lstore.page import Page
 from lstore.page_range import PageRange
@@ -19,9 +20,9 @@ class Table:
     :param key: int             #Index of table key in columns
     """
 
-    def __init__(self, name: str, num_columns: int, key: int):
+    def __init__(self, name: str, num_columns: int, key: DataIndex):
         self.name: str = name
-        self.key: int = key
+        self.key = key
         self.num_columns: int = num_columns
         class PageDirectoryEntry(TypedDict):
             page: Page

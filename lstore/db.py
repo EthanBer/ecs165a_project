@@ -1,3 +1,4 @@
+from lstore.ColumnIndex import DataIndex
 from lstore.table import Table
 
 class Database():
@@ -19,7 +20,7 @@ class Database():
     :param num_columns: int     #Number of Columns: all columns are integer
     :param key: int             #Index of table key in columns
     """
-    def create_table(self, name : str, num_columns : int, key_index : int) -> Table:
+    def create_table(self, name : str, num_columns : int, key_index : DataIndex) -> Table:
         table = Table(name, num_columns, key_index)
         return table
 

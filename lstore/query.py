@@ -1,3 +1,4 @@
+from lstore.ColumnIndex import DataIndex
 from lstore.table import Table, Record
 from lstore.index import Index
 from lstore.page import Page
@@ -35,19 +36,21 @@ class Query:
     def insert(self, *columns: int | None) -> bool:
         schema_encoding = 0
 
+        page = None
         if len(self.table.page_directory) == 0:
             page = BasePage(self.table.num_columns, self.table.key)
             self.table.page_ranges[0].base_pages.append(page)
-
         elif not self.table.page_ranges[-1].base_pages[-1].has_capacity():
             page = BasePage(self.table.num_columns, self.table.key)
             self.table.page_ranges[-1].base_pages.append(page)
+        else:
+            page = self.table.page_ranges[-1].base_pages[-1]
 
         rid = self.table.page_ranges[-1].base_pages[-1].insert(
-            schema_encoding, -1, self.table.key, *columns)
+            schema_encoding, 0, self.table.key, *columns)
         self.table.page_directory[rid] = (page, page.num_records)
 
-        self.table.index.update_index()
+        # self.table.index.update_index()
         return True
 
     """
@@ -60,7 +63,7 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
 
-    def select(self, search_key: int, search_key_index: int, projected_columns_index: list[int]) -> list[Record]:
+    def select(self, search_key: int, search_key_index: DataIndex, projected_columns_index: list[DataIndex]) -> list[Record]:
         return []
         pass
 
