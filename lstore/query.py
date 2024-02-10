@@ -36,11 +36,11 @@ class Query:
         schema_encoding = 0
 
         if len(self.table.page_directory) == 0:
-            page = BasePage(self.table.num_columns)
+            page = BasePage(self.table.num_columns, self.table.key)
             self.table.page_ranges[0].base_pages.append(page)
 
         elif not self.table.page_ranges[-1].base_pages[-1].has_capacity():
-            page = BasePage(self.table.num_columns)
+            page = BasePage(self.table.num_columns, self.table.key)
             self.table.page_ranges[-1].base_pages.append(page)
 
         rid = self.table.page_ranges[-1].base_pages[-1].insert(

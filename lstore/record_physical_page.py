@@ -1,5 +1,4 @@
 import struct
-from typing import NewType
 
 # from lstore.ColumnIndex import DataIndex, RawIndex
 RawIndex = NewType('RawIndex', int) # Index taking into account the metadata
@@ -38,4 +37,4 @@ class PhysicalPage:
         if record_idx == -1:
             return int(self.data[-4:])
             #return Record()
-        return int(self.data[record_idx:record_idx+4])
+        return int.from_bytes(self.data[record_idx:record_idx+4], 'big') # Big endianness

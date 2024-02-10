@@ -9,7 +9,10 @@ last_rid = 0
 
 
 class Page:
-    def __init__(self, num_columns: int):
+    def __init__(self, num_columns: int, key : DataIndex):
+
+        self.key = key
+
         self.num_records = 0
         self.physical_pages: list[PhysicalPage] = []
         # self.page_range = page_range
@@ -66,17 +69,13 @@ class Page:
         # get record at idx n of this page
         if record_idx == -1:
             return self.physical_pages[-1].data[-8:]
-        
-        top_idx = record_idx // self.physical_page_size
-        bottom_idx = record_idx % self.physical_page_size
 
         indirection_column = self.physical_pages[config.INDIRECTION_COLUMN].__get_nth_record__(record_idx)
         rid = self.physical_pages[config.RID_COLUMN].__get_nth_record__(record_idx)
         schema_encoding = self.physical_pages[config.SCHEMA_ENCODING_COLUMN].__get_nth_record__(record_idx)
-        key = self.physical_pages[config.KEY_COLUMN].__get_nth_record__(record_idx)
-
+        
         columns = []
-        for i in range(4, 4 + self.num_columns):
+        for i in range(3, 3 + self.num_columns):
             columns.append(self.physical_pages[i].__get_nth_record__(record_idx))
         
-        return Record(indirection_column, rid, schema_encoding, key, *columns)
+        return Record(indirection_column, rid, schema_encoding, self.key, *columns)

@@ -1,6 +1,5 @@
 from lstore.db import Database
 from lstore.query import Query
-
 from random import choice, randint, sample, seed
 
 
@@ -36,7 +35,6 @@ def debugger(db : Database):
                     print(current_tail_page.physical_pages[l].data)
 
 
-        
 
 if __name__ == "__main__":
 
