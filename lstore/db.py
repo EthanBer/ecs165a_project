@@ -18,10 +18,12 @@ class Database():
     # Creates a new table
     :param name: string         #Table name
     :param num_columns: int     #Number of Columns: all columns are integer
-    :param key: int             #Index of table key in columns
+    :param key_index: int             #Index of table key in columns
     """
-    def create_table(self, name : str, num_columns : int, key_index : DataIndex) -> Table:
+    def create_table(self, name : str, num_columns : int, key_index : int | DataIndex) -> Table:
+        key_index = DataIndex(key_index)
         table = Table(name, num_columns, key_index)
+        self.tables.append(table)
         return table
 
     

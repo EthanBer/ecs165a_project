@@ -20,9 +20,9 @@ class Table:
     :param key: int             #Index of table key in columns
     """
 
-    def __init__(self, name: str, num_columns: int, key: DataIndex):
+    def __init__(self, name: str, num_columns: int, key: int | DataIndex):
         self.name: str = name
-        self.key = key
+        self.key = DataIndex(key)
         self.num_columns: int = num_columns
         class PageDirectoryEntry(TypedDict):
             page: Page

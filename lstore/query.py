@@ -65,7 +65,8 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
 
-    def select(self, search_key: int, search_key_index: DataIndex, projected_columns_index: list[DataIndex]) -> list[Record]:
+    def select(self, search_key: int, search_key_index: int | DataIndex, projected_columns_index: list[DataIndex]) -> list[Record]:
+        search_key_index = DataIndex(search_key_index)
         return []
         pass
 
