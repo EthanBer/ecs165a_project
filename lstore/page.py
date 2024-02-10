@@ -33,7 +33,7 @@ class Page:
 
 
     # Returns -1 if there is no capacity in the page
-    def insert(self, schema_encoding: int, indirection_column: int, key:int, *columns: int) -> int:
+    def insert(self, timestamp: int, schema_encoding: int, indirection_column: int, key:int, *columns: int) -> int:
         # NOTE: should follow same format as records, should return RID of successful record
         last_rid = 0
         record = Record(indirection_column, last_rid, schema_encoding, key, *columns)
@@ -42,10 +42,9 @@ class Page:
         print(columns)
         list_columns = list(columns)
         list_columns.insert(config.INDIRECTION_COLUMN, indirection_column)
-        # list_columns.insert(config.TIMESTAMP_COLUMN, timestamp)    uncomment for next milestone
+        list_columns.insert(config.TIMESTAMP_COLUMN, timestamp)
         list_columns.insert(config.RID_COLUMN, last_rid)
         list_columns.insert(config.SCHEMA_ENCODING_COLUMN, schema_encoding)
-        # list_columns.insert(config.KEY_COLUMN, key)
         columns = tuple(list_columns)
 
         if (self.has_capacity == False):
@@ -68,6 +67,7 @@ class Page:
         indirection_column = self.physical_pages[config.INDIRECTION_COLUMN].__get_nth_record__(record_idx)
         rid = self.physical_pages[config.RID_COLUMN].__get_nth_record__(record_idx)
         schema_encoding = self.physical_pages[config.SCHEMA_ENCODING_COLUMN].__get_nth_record__(record_idx)
+        timestamp = self.physical_pages[config.TIMESTAMP_COLUMN].__get_nth_record__(record_idx)
         key_col = self.physical_pages[self.key].__get_nth_record__(record_idx)
         
         columns = []
