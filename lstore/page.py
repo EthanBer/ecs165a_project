@@ -1,8 +1,6 @@
 
-from lstore.record_physical_page import Record, PhysicalPage
-
+from lstore.record_physical_page import Record, PhysicalPage, DataIndex, RawIndex
 from lstore.config import config
-from lstore.ColumnIndex import RawIndex, DataIndex
 
 global last_rid
 last_rid = 0

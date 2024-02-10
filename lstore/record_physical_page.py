@@ -1,4 +1,5 @@
 import struct
+from typing import NewType
 
 # from lstore.ColumnIndex import DataIndex, RawIndex
 RawIndex = NewType('RawIndex', int) # Index taking into account the metadata
