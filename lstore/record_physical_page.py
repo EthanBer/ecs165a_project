@@ -1,9 +1,7 @@
 import struct
 from typing import NewType
 
-# from lstore.ColumnIndex import DataIndex, RawIndex
-RawIndex = NewType('RawIndex', int) # Index taking into account the metadata
-DataIndex = NewType('DataIndex', int) # Index not taking into account the metadata
+from lstore.ColumnIndex import DataIndex, RawIndex
 
 class Record:
     def __init__(self, indirection_column: int, rid :int, schema_encoding: int, key : DataIndex, *columns : int):

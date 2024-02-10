@@ -33,7 +33,7 @@ class Table:
         self.index = Index(self)
 
         self.page_ranges: list[PageRange] = []
-        self.page_ranges.append(PageRange(self.num_columns))
+        self.page_ranges.append(PageRange(self.num_columns, key))
 
     def get_record_by_rid(self, rid: int) -> Record:
         page_dir_entry = self.page_directory[rid]
