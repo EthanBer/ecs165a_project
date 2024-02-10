@@ -2,7 +2,8 @@ from lstore.table import Table, Record
 from lstore.index import Index
 from lstore.page import Page
 from lstore.base_tail_page import BasePage, TailPage
-
+#from time import time
+import time
 
 class Query:
     """
@@ -34,6 +35,7 @@ class Query:
 
     def insert(self, *columns: int | None) -> bool:
         schema_encoding = 0
+        timestamp = int(time.time())
 
         if len(self.table.page_directory) == 0:
             page = BasePage(self.table.num_columns, self.table.key)
@@ -44,7 +46,7 @@ class Query:
             self.table.page_ranges[-1].base_pages.append(page)
 
         rid = self.table.page_ranges[-1].base_pages[-1].insert(
-            schema_encoding, -1, self.table.key, *columns)
+            timestamp, schema_encoding, 0, self.table.key, *columns)
         self.table.page_directory[rid] = (page, page.num_records)
 
         self.table.index.update_index()
