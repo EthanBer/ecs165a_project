@@ -1,8 +1,10 @@
-from lstore.table import Table, Record
+from lstore.ColumnIndex import DataIndex
+from lstore.table import PageDirectoryEntry, Table, Record
 from lstore.index import Index
 from lstore.page import Page
 from lstore.base_tail_page import BasePage, TailPage
-
+#from time import time
+import time
 
 class Query:
     """
@@ -23,8 +25,10 @@ class Query:
     # Return False if record doesn't exist or is locked due to 2PL
     """
 
-    def delete(self, primary_key):
+    """
+    def delete(self, primary_key: int) -> bool:
         pass
+    """
 
     """
     # Insert a record with specified columns
@@ -32,21 +36,25 @@ class Query:
     # Returns False if insert fails for whatever reason
     """
 
-    def insert(self, *columns: list[int | None]) -> bool:
+    def insert(self, *columns: int | None) -> bool:
         schema_encoding = 0
+        timestamp = int(time.time())
 
+        page = None
         if len(self.table.page_directory) == 0:
-            page = BasePage(self.table.page_ranges[0], self.table.num_columns)
+            page = BasePage(self.table.num_columns, self.table.key_index)
             self.table.page_ranges[0].base_pages.append(page)
-
         elif not self.table.page_ranges[-1].base_pages[-1].has_capacity():
-            page = BasePage(self.table.page_ranges[-1], self.table.num_columns)
+            page = BasePage(self.table.num_columns, self.table.key_index)
             self.table.page_ranges[-1].base_pages.append(page)
+        else:
+            page = self.table.page_ranges[-1].base_pages[-1]
 
         rid = self.table.page_ranges[-1].base_pages[-1].insert(
-            schema_encoding, -1, *columns)
-        self.table.page_directory[rid] = (page, page.num_records)
+            timestamp, schema_encoding, 0, self.table.key_index, *columns)
+        self.table.page_directory[rid] = PageDirectoryEntry(page, page.num_records)
 
+        # self.table.index.update_index()
         return True
 
     """
@@ -59,7 +67,9 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
 
-    def select(self, search_key: int, search_key_index: int, projected_columns_index: list[int]) -> list[Record]:
+    def select(self, search_key: int, search_key_index: int | DataIndex, projected_columns_index: list[int | DataIndex]) -> list[Record]:
+        search_key_index = DataIndex(search_key_index)
+        projected_columns_index = [DataIndex(idx) for idx in projected_columns_index]
         return []
         pass
 
@@ -74,9 +84,9 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
 
-    def select_version(self, search_key, search_key_index, projected_columns_index, relative_version):
-        true_index = search_key_index + 4
-        pass
+    # def select_version(self, search_key, search_key_index, projected_columns_index, relative_version):
+    #     true_index = search_key_index + 4
+    #     pass
 
     """
     # Update a record with specified key and columns
@@ -89,17 +99,15 @@ class Query:
             columns) == self.table.num_columns, "len(columns) must be equal to number of columns in table"
         if len(columns) != self.table.num_columns:
             return False
-        INDIRECTION_COLUMN = 0
-        RID_COLUMN = 1
-        primary_key_matches = self.select(primary_key, self.table.key, [
+        primary_key_matches = self.select(primary_key, self.table.key_index, [
                                           1, 1] + ([0] * (len(columns) - 2)))
         if len(primary_key_matches) == 0:
             return False
         assert len(primary_key_matches) == 1
         # select indirection and rid columns
         base_record = primary_key_matches[0]
-        page_range = self.table.page_directory[base_record.rid]["page"].page_range
-        tail_page = page_range.tail_pages[-1]
+        # page_range = self.table.page_directory[base_record.rid].page.page_range
+        # tail_page = page_range.tail_pages[-1]
         first_update = False
         tail_1_values: list[int | None] = []
         tail_1_indirection: int = 0
@@ -119,9 +127,9 @@ class Query:
             # new_record_values.append([])
             # ... put tail record
         tail_schema_encoding = 0  # ..for now. we need to take into account updated columns
-        if not tail_page.has_capacity(2 if first_update else 1):
-            tail_page = TailPage(page_range, page_range.num_columns)
-            page_range.append_tail_page(tail_page)
+        # if not tail_page.has_capacity(2 if first_update else 1):
+        #     tail_page = TailPage(page_range, page_range.num_columns)
+        #     page_range.append_tail_page(tail_page)
 
         updated_columns: list[int | None] = [None] * self.table.num_columns
         for i, column in enumerate(reversed(columns)):
@@ -141,8 +149,11 @@ class Query:
                 last_update_page_dir_entry = self.table.page_directory[last_update_rid]
             else:
                 assert False, "brh"
-            prev_schema_encoding = last_update_page_dir_entry["page"].get_nth_record(
-                last_update_page_dir_entry["offset"]).schema_encoding
+
+            prev_schema_encoding = get_record_by_rid(last_update_rid)
+
+            # prev_schema_encoding = last_update_page_dir_entry["page"].get_nth_record(
+            #     last_update_page_dir_entry["offset"]).schema_encoding
             tail_schema_encoding |= prev_schema_encoding
 
         tail_page.insert(tail_indirection,
@@ -217,7 +228,7 @@ class Query:
     """
 
     def increment(self, key, column):
-        r = self.select(key, self.table.key, [1] * self.table.num_columns)[0]
+        r = self.select(key, self.table.key_index, [1] * self.table.num_columns)[0]
         if r is not False:
             updated_columns = [None] * self.table.num_columns
             updated_columns[column] = r[column] + 1

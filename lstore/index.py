@@ -3,9 +3,11 @@ A  -Trees, but other data structures can be used as well.
 """
 
 
+from lstore.table import Table
+
 class Index:
 
-    def __init__(self, table):
+    def __init__(self, table: Table):
         # One index for each table. All our empty initially.
         self.indices = [None] * table.num_columns
         pass
@@ -21,7 +23,7 @@ class Index:
         # Source of B-tree code:
         # https://www.geeksforgeeks.org/introduction-of-b-tree-2/
         def __init__(self, t):
-            self.root = BTreeNode(True)
+            self.root = Index.BTreeNode(True)
             self.t = t
 
         def insert(self, k):
@@ -140,6 +142,7 @@ class Index:
             else:
                 return self.search_key_range(begin, end, self.root)
 
+
     """
     # returns the location of all records with the given value on column "column"
     """
@@ -199,3 +202,4 @@ class Index:
 
     def drop_index(self, column_number):
         pass
+
