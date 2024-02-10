@@ -36,3 +36,9 @@ class PhysicalPage:
             return int(self.data[-4:])
             #return Record()
         return int.from_bytes(self.data[record_idx:record_idx+4], 'big') # Big endianness
+    
+    def __str__(self) -> str:
+        physical_page_contents = []
+        for i in range(64):
+            physical_page_contents.append(self.__get_nth_record__(i))
+        return str(physical_page_contents)

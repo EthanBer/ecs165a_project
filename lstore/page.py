@@ -1,4 +1,5 @@
 
+import random
 from lstore.record_physical_page import Record, PhysicalPage, DataIndex, RawIndex
 from lstore.config import config
 
@@ -7,12 +8,14 @@ last_rid = 0
 
 
 class Page:
-    def __init__(self, num_columns: int, key : DataIndex):
+    def __init__(self, num_columns: int, key_index : DataIndex):
 
-        self.key = key
+        self.key_index = key_index
+        self.id = random.randrange(1, int(1e10))
 
         self.num_records = 0
         self.physical_pages: list[PhysicalPage] = []
+
         # self.page_range = page_range
         self.num_columns = num_columns
         for _ in range(self.num_columns + config.NUM_METADATA_COL):
@@ -26,6 +29,20 @@ class Page:
         self.physical_page_size: int = self.physical_pages[0].size
         # assert len(self.physical_pages) == num_columns
 
+    # def __str__(self) -> str:
+        
+    #     for physical_page in self.physical_pages:
+            
+    @property
+    def high_level_str(self) -> str:
+        return f"Page id {self.id} starting with RID{self.physical_pages[config.RID_COLUMN].__get_nth_record__(0)}"
+
+    def __str__(self) -> str:
+        newline = "\n"
+        return f"""
+{4 * config.INDENT}{self.high_level_str}; key_index:{self.key_index}; num_records:{self.num_records}; num_columns:{self.num_columns}
+{5 * config.INDENT}physical_pages:{config.str_each_el(self.physical_pages, newline + (5 * config.INDENT) + (15 * " "))}"""
+
     def has_capacity(self, n: int=1) -> bool:
         # if self.num_records
         # checks if we have capacity for n more records
@@ -33,7 +50,7 @@ class Page:
 
 
     # Returns -1 if there is no capacity in the page
-    def insert(self, timestamp: int, schema_encoding: int, indirection_column: int, key:int, *columns: int) -> int:
+    def insert(self, timestamp: int, schema_encoding: int, indirection_column: int, key:int, *columns: int | None) -> int:
         # NOTE: should follow same format as records, should return RID of successful record
         last_rid = 0
         record = Record(indirection_column, last_rid, schema_encoding, key, *columns)
@@ -60,6 +77,7 @@ class Page:
 
     # def update(self):
     #     pass
+        
 
 
     def get_nth_record(self, record_idx: int) -> Record:
@@ -68,10 +86,10 @@ class Page:
         rid = self.physical_pages[config.RID_COLUMN].__get_nth_record__(record_idx)
         schema_encoding = self.physical_pages[config.SCHEMA_ENCODING_COLUMN].__get_nth_record__(record_idx)
         timestamp = self.physical_pages[config.TIMESTAMP_COLUMN].__get_nth_record__(record_idx)
-        key_col = self.physical_pages[self.key].__get_nth_record__(record_idx)
+        key_col = self.physical_pages[self.key_index].__get_nth_record__(record_idx)
         
         columns = []
         for i in range(config.NUM_METADATA_COL, config.NUM_METADATA_COL + self.num_columns):
             columns.append(self.physical_pages[i].__get_nth_record__(record_idx))
         
-        return Record(indirection_column, rid, schema_encoding, self.key, *columns)
+        return Record(indirection_column, rid, schema_encoding, self.key_index, *columns)

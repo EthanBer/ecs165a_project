@@ -3,13 +3,17 @@ from lstore.query import Query
 from random import choice, randint, sample, seed
 
 
-
-def debugger(db : Database):
+def debugger_2(db: Database) -> None:
+    print("DATABASE: ")
+    for table in db.tables:
+        print(table)
+   
+def debugger(db : Database) -> None:
 
     for i in range(len(db.tables)):
         table = db.tables[i]
 
-        print("Table: ", table.name)
+        print("Table Name: ", table.name)
         print("Page Directory: ")
         print(table.page_directory)
 
@@ -23,7 +27,7 @@ def debugger(db : Database):
 
                 #Printing physical pages of the current base page
                 for l in range(len(current_base_page.physical_pages)):
-                    print(current_base_page.physical_pages[l].data)
+                    print(int.from_bytes(current_base_page.physical_pages[l].data))
 
 
             #Printing tail pages of the current page_range
@@ -54,7 +58,7 @@ query = Query(grades_table)
 # dictionary for records to test the database: test directory
 records = {}
 
-number_of_records = 10
+number_of_records = 1
 seed(3562901)
 
 for i in range(0, number_of_records):
@@ -69,9 +73,9 @@ for i in range(0, number_of_records):
     query.insert(*records[key])
     # print('inserted', records[key])
 print("Insert finished")
-print(db.tables)
+# print(db.tables)
 
-debugger(db)
+debugger_2(db)
 # # Check inserted records using select query
 # for key in records:
 #     # select function will return array of records 

@@ -3,16 +3,18 @@ from lstore.table import Table
 
 class Database():
 
-    def __init__(self):
-        self.tables = []
+    def __init__(self) -> None:
+        self.tables: list[Table] = []
         pass
 
     # Not required for milestone1
+    """
     def open(self, path):
         pass
 
     def close(self):
         pass
+    """
 
     """
     # Creates a new table
@@ -29,7 +31,6 @@ class Database():
     
     """
     # Deletes the specified table
-    """
     def drop_table(self, name):
         # remove the Table that has the name passed in
         # self.tables = self.tables.filter((lambda x): x.name != name) 
@@ -41,3 +42,4 @@ class Database():
     """
     def get_table(self, name):
         pass
+    """
