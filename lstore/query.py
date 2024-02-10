@@ -39,7 +39,7 @@ class Query:
         page = tmp.page
         offset = tmp.offset
 
-        bitmask = 1 << (self.table.num_columns -1)
+        bitmask = 1 << (self.table.num_columns - config.RID_COLUMN)
         packed_data = struct.pack('>Q', bitmask)
         # Append the packed bytes to the bytearray
         page.physical_pages[config.NULL_COLUMN].data[offset*8:offset*8+8] = packed_data

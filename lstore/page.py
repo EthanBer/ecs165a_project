@@ -55,6 +55,12 @@ class Page:
         # NOTE: should follow same format as records, should return RID of successful record
         record = Record(indirection_column, Page.last_rid, schema_encoding, key, *columns)
 
+        null_bitmask = 0
+        idx = 0
+        for column in columns:
+            if column is None:
+                null_bitmask = null_bitmask | (1 << (len(columns)-idx))
+        
         # Transform columns to a list to append the schema encoding and the indirection column
         print(columns)
         list_columns = list(columns)
@@ -62,7 +68,7 @@ class Page:
         list_columns.insert(config.RID_COLUMN, Page.last_rid)
         list_columns.insert(config.TIMESTAMP_COLUMN, timestamp)
         list_columns.insert(config.SCHEMA_ENCODING_COLUMN, schema_encoding)
-        list_columns.insert(config.NULL_COLUMN, 0)
+        list_columns.insert(config.NULL_COLUMN, null_bitmask)
         columns = tuple(list_columns)
         print("COLUMNS with metadata")
         print(columns)
