@@ -24,19 +24,39 @@ class PhysicalPage:
         self.offset = 0
 
     def insert(self, value: int) -> None:
-        # Pack the 64-bit integer into bytes (using 'Q' format for unsigned long long)
-        packed_data = struct.pack('Q', value)
+        # Pack the 64-bit integer into bytes (using '>Q' format for unsigned long long with big endian)
+        packed_data = struct.pack('>Q', value)
+        if self.offset + 8 > len(self.data):
+            raise ValueError("Not enough space in bytearray")
+        
         # Append the packed bytes to the bytearray
-        self.data[:len(packed_data)] = packed_data
-        self.offset += 64
+        self.data[self.offset : self.offset+8] = packed_data
 
+        value = struct.unpack('>Q', self.data[self.offset:self.offset+8])[0]
+        print("Value: ", value)
+
+        self.offset += 8
 
     def __get_nth_record__(self, record_idx: int) -> int:
         if record_idx == -1:
             return int(self.data[-4:])
             #return Record()
-        return int.from_bytes(self.data[record_idx:record_idx+4], 'big') # Big endianness
+        
+        num_records = self.offset / 8
+        if (record_idx > num_records):
+            return 0
+        
+        value = struct.unpack('>Q', self.data[record_idx : record_idx+8])[0]
+
+        if (value != 0):
+            #print("Value: ", value, "Index: ", record_idx)
+            print("num records: ", num_records)
+            print("offset: ", self.offset)
+            pass
+
+        return value
     
+
     def __str__(self) -> str:
         physical_page_contents = []
         for i in range(64):

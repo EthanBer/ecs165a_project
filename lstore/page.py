@@ -4,14 +4,14 @@ from lstore.record_physical_page import Record, PhysicalPage, DataIndex, RawInde
 from lstore.config import config
 
 global last_rid
-last_rid = 0
+last_rid = 1
 
 
 class Page:
     def __init__(self, num_columns: int, key_index : DataIndex):
 
         self.key_index = key_index
-        self.id = random.randrange(1, int(1e10))
+        self.id = random.randrange(1, int(1e10))    # This ID is just for debugging purposes
 
         self.num_records = 0
         self.physical_pages: list[PhysicalPage] = []
@@ -32,7 +32,7 @@ class Page:
     # def __str__(self) -> str:
         
     #     for physical_page in self.physical_pages:
-            
+    
     @property
     def high_level_str(self) -> str:
         return f"Page id {self.id} starting with RID{self.physical_pages[config.RID_COLUMN].__get_nth_record__(0)}"
@@ -59,10 +59,12 @@ class Page:
         print(columns)
         list_columns = list(columns)
         list_columns.insert(config.INDIRECTION_COLUMN, indirection_column)
-        list_columns.insert(config.TIMESTAMP_COLUMN, timestamp)
         list_columns.insert(config.RID_COLUMN, last_rid)
+        list_columns.insert(config.TIMESTAMP_COLUMN, timestamp)
         list_columns.insert(config.SCHEMA_ENCODING_COLUMN, schema_encoding)
         columns = tuple(list_columns)
+        print("COLUMNS with metadata")
+        print(columns)
 
         if (self.has_capacity == False):
             return -1

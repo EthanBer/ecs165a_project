@@ -3,8 +3,10 @@ from lstore.table import PageDirectoryEntry, Table, Record
 from lstore.index import Index
 from lstore.page import Page
 from lstore.base_tail_page import BasePage, TailPage
-#from time import time
 import time
+from lstore.config import config
+import struct
+from lstore.page_range import PageRange
 
 class Query:
     """
@@ -25,10 +27,39 @@ class Query:
     # Return False if record doesn't exist or is locked due to 2PL
     """
 
-    """
     def delete(self, primary_key: int) -> bool:
-        pass
-    """
+        projected_columns_index = [1] * self.table.num_columns
+        records = self.select(primary_key, self.table.key_index, projected_columns_index)
+        record = records[0]
+
+
+        if (len(records) == 0):
+            return False
+        
+        tmp = self.table.page_directory[record.rid]
+        page = tmp.page
+        offset = tmp.offset
+
+        packed_data = struct.pack('Q', 0)
+        # Append the packed bytes to the bytearray
+        page.physical_pages[config.RID_COLUMN].data[offset*8:offset*8+8] = packed_data
+
+        indirection_column = int.from_bytes(page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8], 'big')
+
+        while indirection_column != 0:
+            tmp = self.table.page_directory[indirection_column]
+            page = tmp.page
+            offset = tmp.offset
+
+            packed_data = struct.pack('Q', 0)
+            # Append the packed bytes to the bytearray
+            page.physical_pages[config.RID_COLUMN].data[offset*8:offset*8+8] = packed_data
+
+            indirection_column = int.from_bytes(page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8],'big')
+
+        return True
+        
+
 
     """
     # Insert a record with specified columns
@@ -50,11 +81,20 @@ class Query:
         else:
             page = self.table.page_ranges[-1].base_pages[-1]
 
+
         rid = self.table.page_ranges[-1].base_pages[-1].insert(
             timestamp, schema_encoding, 0, self.table.key_index, *columns)
-        self.table.page_directory[rid] = PageDirectoryEntry(page, page.num_records)
+        
+        if rid == -1:
+            self.table.page_ranges.append(PageRange(self.table.num_columns, self.table.key_index))
+            rid = self.table.page_ranges[-1].base_pages[-1].insert(
+            timestamp, schema_encoding, 0, self.table.key_index, *columns)
 
-        # self.table.index.update_index()
+
+        page_directory_entry=PageDirectoryEntry(page, page.num_records)
+        self.table.page_directory[rid] = page_directory_entry
+
+        #self.table.index.update_index()
         return True
 
     """

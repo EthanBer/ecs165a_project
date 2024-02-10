@@ -7,7 +7,8 @@ def debugger_2(db: Database) -> None:
     print("DATABASE: ")
     for table in db.tables:
         print(table)
-   
+
+
 def debugger(db : Database) -> None:
 
     for i in range(len(db.tables)):
@@ -16,7 +17,7 @@ def debugger(db : Database) -> None:
         print("Table Name: ", table.name)
         print("Page Directory: ")
         print(table.page_directory)
-
+        
         for j in range(len(table.page_ranges)):
             print("Current page range", j)
 
@@ -27,7 +28,7 @@ def debugger(db : Database) -> None:
 
                 #Printing physical pages of the current base page
                 for l in range(len(current_base_page.physical_pages)):
-                    print(int.from_bytes(current_base_page.physical_pages[l].data))
+                    print(current_base_page.physical_pages[l].data)
 
 
             #Printing tail pages of the current page_range
@@ -37,6 +38,11 @@ def debugger(db : Database) -> None:
                 #Printing physical pages of the current tail page
                 for l in range(len(current_tail_page.physical_pages)):
                     print(current_tail_page.physical_pages[l].data)
+
+
+
+
+
 
 
 
@@ -55,10 +61,12 @@ grades_table = db.create_table('Grades', 5, 0)
 # create a query class for the grades table
 query = Query(grades_table)
 
+
+
 # dictionary for records to test the database: test directory
 records = {}
 
-number_of_records = 1
+number_of_records = 2
 seed(3562901)
 
 for i in range(0, number_of_records):
@@ -69,36 +77,7 @@ for i in range(0, number_of_records):
         key = 92106429 + randint(0, number_of_records)
 
     records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
-    print("hiii")
     query.insert(*records[key])
-    # print('inserted', records[key])
+    print(key, records)
 print("Insert finished")
-# print(db.tables)
-
 debugger_2(db)
-# # Check inserted records using select query
-# for key in records:
-#     # select function will return array of records 
-#     # here we are sure that there is only one record in t hat array
-#     # check for retreiving version -1. Should retreive version 0 since only one version exists.
-#     record = query.select_version(key, 0, [1, 1, 1, 1, 1], -1)[0]
-#     error = False
-#     for i, column in enumerate(record.columns):
-#         if column != records[key][i]:
-#             error = True
-#     if error:
-#         print('select error on', key, ':', record, ', correct:', records[key])
-#     else:
-#         pass
-#         # print('select on', key, ':', record)
-
-
-
-
-
-
-
-
-
-
-
