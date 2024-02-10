@@ -13,9 +13,10 @@ RID_COLUMN = 1
 SCHEMA_ENCODING_COLUMN = 2
 
 class PageDirectoryEntry:
-    def __init__(self, page: Page, offset: int):
+    def __init__(self, page_range: PageRange, page: Page, offset: int):
         self.page = page
         self.offset = offset
+        self.page_range = page_range
     @property
     def high_level_str(self) -> str:
         return f"({self.page.high_level_str}, {self.offset})"

@@ -72,14 +72,18 @@ class Query:
         timestamp = int(time.time())
 
         page = None
+        page_range = None
         if len(self.table.page_directory) == 0:
             page = BasePage(self.table.num_columns, self.table.key_index)
+            page_range = self.table.page_ranges[0]
             self.table.page_ranges[0].base_pages.append(page)
         elif not self.table.page_ranges[-1].base_pages[-1].has_capacity():
             page = BasePage(self.table.num_columns, self.table.key_index)
+            page_range = self.table.page_ranges[-1]
             self.table.page_ranges[-1].base_pages.append(page)
         else:
             page = self.table.page_ranges[-1].base_pages[-1]
+            page_range = self.table.page_ranges[-1]
 
 
         rid = self.table.page_ranges[-1].base_pages[-1].insert(
