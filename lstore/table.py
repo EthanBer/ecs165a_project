@@ -1,8 +1,10 @@
 from time import time
 from typing import TypedDict
 
-from lstore.page import PageRange, Page
-from lstore.ColumnIndex import RawIndex, DataIndex
+from lstore.page import Page
+from lstore.page_range import PageRange
+from lstore.record_physical_page import Record
+# from lstore.ColumnIndex import RawIndex, DataIndex
 
 INDIRECTION_COLUMN = 0
 RID_COLUMN = 1

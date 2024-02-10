@@ -1,4 +1,4 @@
-from lstore.base_tail_page import BasePage, TailPageç
+from lstore.base_tail_page import BasePage, TailPage
 
 class PageRange:
     def __init__(self, num_columns: int):

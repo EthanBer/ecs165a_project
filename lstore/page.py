@@ -1,7 +1,5 @@
-from typing import NewType
 
 from lstore.record_physical_page import Record, PhysicalPage
-from lstore.table import Record
 
 from lstore.config import config
 from lstore.ColumnIndex import RawIndex, DataIndex
@@ -36,6 +34,7 @@ class Page:
     # Returns -1 if there is no capacity in the page
     def insert(self, schema_encoding: int, indirection_column: int, key:int, *columns: int) -> int:
         # NOTE: should follow same format as records, should return RID of successful record
+        last_rid = 0
         record = Record(indirection_column, last_rid, schema_encoding, key, *columns)
 
         # Transform columns to a list to append the schema encoding and the indirection column
@@ -45,7 +44,7 @@ class Page:
         # list_columns.insert(config.TIMESTAMP_COLUMN, timestamp)    uncomment for next milestone
         list_columns.insert(config.RID_COLUMN, last_rid)
         list_columns.insert(config.SCHEMA_ENCODING_COLUMN, schema_encoding)
-        list_columns.insert(config.KEY_COLUMN, key)
+        # list_columns.insert(config.KEY_COLUMN, key)
         columns = tuple(list_columns)
 
         if (self.has_capacity == False):
