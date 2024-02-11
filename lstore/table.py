@@ -58,10 +58,10 @@ class Table:
         return f"""{config.INDENT}TABLE: {self.name}
 {config.INDENT}key index: {self.key_index}
 {config.INDENT}num_columns: {self.num_columns}
-{config.INDENT}page_directory_raw: {self.page_directory}
 {config.INDENT}page_directory: {self.page_directory_str}
 {config.INDENT}page_ranges: {self.page_range_str}"""
 
+# {config.INDENT}page_directory_raw: {self.page_directory}
     def get_record_by_rid(self, rid: int) -> Record:
         page_dir_entry = self.page_directory[rid]
         return page_dir_entry.page.get_nth_record(

@@ -17,6 +17,9 @@ class Record:
         # this syntax is used in the increment() function of query.py, so this operator should be implemented
         return self.columns[key]
 
+    def __str__(self) -> str:
+        return f"Record RID{self.rid}; idr:{self.indirection_column}; senc:{bin(self.schema_encoding)}; key:{self.key}; columns:{self.columns}"
+
 
 class PhysicalPage:
 
@@ -49,6 +52,8 @@ class PhysicalPage:
         
         value = struct.unpack(config.PACKING_FORMAT_STR, self.data[(record_idx * 8) : (record_idx * 8)+8])[0]
 
+
+
         if (value != 0):
             #print("Value: ", value, "Index: ", record_idx)
             # print("num records: ", num_records) print("offset: ", self.offset)
@@ -58,7 +63,7 @@ class PhysicalPage:
     
 
     def __str__(self) -> str:
-        physical_page_contents: list[int] = []
+        physical_page_contents: list[int | None] = []
         for i in range(64):
             rec = self.__get_nth_record__(i)
             # if rec is None:

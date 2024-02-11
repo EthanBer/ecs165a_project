@@ -52,9 +52,17 @@ class Page:
         # NOTE: should follow same format as records, should return RID of successful record
 
         null_bitmask = 0
+        total_cols = len(columns) + config.NUM_METADATA_COL
+        if metadata.indirection_column == None: # set 1 for null indirection column
+            print("setting indirection null bit")
+            null_bitmask = 1 << (total_cols - 1)
         for idx, column in enumerate(columns):
+            print(f"checking cols for null... {column}")
             if column is None:
+                print("found a null col")
                 null_bitmask = null_bitmask | (1 << (len(columns)-idx-1))
+            
+        print(f"inserting null bitmask {bin(null_bitmask)}")
         
         # Transform columns to a list to append the schema encoding and the indirection column
         print(columns)
@@ -84,11 +92,29 @@ class Page:
 
     def get_nth_record(self, record_idx: int) -> Record:
         # get record at idx n of this page
-        indirection_column = self.physical_pages[config.INDIRECTION_COLUMN].__get_nth_record__(record_idx)
-        rid = self.physical_pages[config.RID_COLUMN].__get_nth_record__(record_idx)
-        schema_encoding = self.physical_pages[config.SCHEMA_ENCODING_COLUMN].__get_nth_record__(record_idx)
-        timestamp = self.physical_pages[config.TIMESTAMP_COLUMN].__get_nth_record__(record_idx)
-        key_col = self.physical_pages[self.key_index].__get_nth_record__(record_idx)
+
+        def get_check_for_none(col_idx: RawIndex, record_idx: int) -> int | None:
+            val = self.physical_pages[col_idx].__get_nth_record__(record_idx)
+            # print("getting checking null")
+            if val == 0:
+                # breaking an abstraction barrier for convenience right now. TODO: fix?
+                thing = struct.unpack(config.PACKING_FORMAT_STR, self.physical_pages[config.NULL_COLUMN].data[(record_idx * 8):(record_idx * 8)+8])[0]
+                # is_none = (self.physical_pages[config.NULL_COLUMN].data[(record_idx * 8):(record_idx * 8)+8] == b'x01')
+                is_none = ( thing >> ( self.num_columns + config.NUM_METADATA_COL - col_idx - 1 ) ) & 1
+                if is_none == 1:
+                    print("set some value to None")
+                    val = None
+            return val
+
+        indirection_column, rid, schema_encoding, timestamp, key_col = \
+            get_check_for_none(config.INDIRECTION_COLUMN, record_idx), \
+            get_check_for_none(config.RID_COLUMN, record_idx), \
+            get_check_for_none(config.SCHEMA_ENCODING_COLUMN, record_idx), \
+            get_check_for_none(config.TIMESTAMP_COLUMN, record_idx), \
+            get_check_for_none(config.data_to_raw_idx(self.key_index), record_idx), \
+        
+        if rid is None or timestamp is None or schema_encoding is None:
+            raise(Exception("rid or timestamp or schema_encoding was None when reading"))
         
         columns = []
         for i in range(config.NUM_METADATA_COL, config.NUM_METADATA_COL + self.num_columns):

@@ -60,7 +60,7 @@ query = Query(grades_table)
 # dictionary for records to test the database: test directory
 records = {}
 
-number_of_records = 3
+number_of_records = 1
 seed(3562901)
 
 for i in range(0, number_of_records):
@@ -74,7 +74,9 @@ for i in range(0, number_of_records):
     query.insert(*records[key])
     print(key, records)
 print("insert finished")
+print(db.tables[0].get_record_by_rid(1))
 # debugger_2(db)
+
 
 updated_records = {}
 for key in records:
@@ -89,4 +91,7 @@ for key in records:
     query.update(key, *updated_columns)
 print("update finished. records:")
 print(updated_records)
-debugger_2(db)
+# debugger_2(db)
+print(db.tables[0].get_record_by_rid(1))
+print(db.tables[0].get_record_by_rid(2))
+print(db.tables[0].get_record_by_rid(3))

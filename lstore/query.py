@@ -58,7 +58,7 @@ class Query:
         return True
         
 
-    def insert_tail(self, page_range: PageRange, indirection_column: int, schema_encoding: int, *columns: int | None) -> bool:
+    def insert_tail(self, page_range: PageRange, indirection_column: int, schema_encoding: int, *columns: int | None) -> int: # returns RID if successful
         tail_page = page_range.tail_pages[-1]
         timestamp = int(time.time())
 
@@ -75,7 +75,7 @@ class Query:
         page_directory_entry = PageDirectoryEntry(page_range, tail_page, tail_page.num_records - 1)
         self.table.page_directory[rid] = page_directory_entry
         self.table.last_rid += 1
-        return True
+        return rid
 
         # else:self.
         #     page = self.table.page_ranges[-1].tail_pages[-1]
@@ -104,7 +104,6 @@ class Query:
         if not self.table.page_ranges[-1].base_pages[-1].has_capacity(): # the last page of the page range is full
             if not self.table.page_ranges[-1].has_capacity(): # the page range can't handle another page, so make a new range. this range implicitly makes a new page as well
                 self.table.page_ranges.append(PageRange(self.table.num_columns, self.table.key_index, self.table.pages_per_range))
-                rid = self.table.page_ranges[-1].base_pages[-1].insert(Metadata(None, self.table.last_rid, timestamp, schema_encoding), *columns)
             else: # the last page of the range was full, but the page range can accomodate another page, so make one
                 page = BasePage(self.table.num_columns, self.table.key_index)
                 page_range = self.table.page_ranges[-1]
@@ -142,9 +141,20 @@ class Query:
     def select(self, search_key: int, search_key_index: int | DataIndex, projected_columns_index: list[int | DataIndex]) -> list[Record]:
         search_key_index = DataIndex(search_key_index)
         projected_columns_index = [DataIndex(idx) for idx in projected_columns_index]
+
+        ret: list[Record] = []
+        for rid in range(1, self.table.last_rid):
+            rec = self.table.get_record_by_rid(rid)
+            col_list = list(rec.columns)
+            if rec.columns[search_key_index] == search_key:
+                for i, col in enumerate(col_list):
+                    if projected_columns_index[i] == 0:
+                        col_list[i] = None 
+                        # rec.columns[i] = None  # filter out that column from the projection
+                rec.columns = tuple(col_list)
+                ret.append(rec)
         # self.table.page_ranges.
-        return []
-        pass
+        return ret 
 
     """
     # Read matching record with specified search key
@@ -172,8 +182,7 @@ class Query:
             columns) == self.table.num_columns, "len(columns) must be equal to number of columns in table"
         if len(columns) != self.table.num_columns:
             return False
-        primary_key_matches = self.select(primary_key, self.table.key_index, [
-                                          1, 1] + ([0] * (len(columns) - 2)))
+        primary_key_matches = self.select(primary_key, self.table.key_index, [1] * len(columns))
         if len(primary_key_matches) == 0:
             return False
         assert len(primary_key_matches) == 1 # primary key results in ONE select result
@@ -188,6 +197,7 @@ class Query:
         tail_1_indirection: int = 0
         tail_1_schema_encoding: int = 0
         tail_indirection: int
+        first_update = False
 
         if base_record.indirection_column is None:  # this record hasn't been updated before
             first_update = True
@@ -211,7 +221,7 @@ class Query:
                 updated_columns[i] = column
                 schema_shift = 1 << (self.table.num_columns - i - 1)
                 if first_update:
-                    tail_1_values[i] = column
+                    tail_1_values[i] = base_record.columns[i]
                     tail_1_schema_encoding |= schema_shift
                 tail_schema_encoding |= schema_shift
 
@@ -234,6 +244,7 @@ class Query:
 
         base_indirection = self.insert_tail(page_range, tail_indirection, tail_schema_encoding, *updated_columns)
         success = base_page_dir_entry.page.update_nth_record(base_page_dir_entry.offset, config.INDIRECTION_COLUMN, base_indirection)
+        assert success, "update not successful"
 
         return success # True if update was successful
 

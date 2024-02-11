@@ -1,4 +1,4 @@
-from lstore.ColumnIndex import RawIndex
+from lstore.ColumnIndex import DataIndex, RawIndex
 
 
 class config:
@@ -17,6 +17,10 @@ class config:
 	@staticmethod
 	def str_each_el(arr: list, delim: str="") -> str:
 		return delim.join([str(el) for el in arr])
+
+	@staticmethod
+	def data_to_raw_idx(idx: DataIndex) -> RawIndex:
+		return RawIndex(idx + config.NUM_METADATA_COL)
 		# s = ""
 		# for el in arr:
 		# 	s += el.__str__()

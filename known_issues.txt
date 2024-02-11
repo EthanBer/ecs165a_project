@@ -1,2 +1,3 @@
-- page range capacity not implemented
+x page range capacity not implemented
 - raise exception is used instead of return False
+- updated values are not gotten by get_nth_record
