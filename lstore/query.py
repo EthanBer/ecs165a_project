@@ -290,7 +290,12 @@ class Query:
     """
 
     def sum(self, start_range, end_range, aggregate_column_index):
-        pass
+        s = 0
+        for rid in range(start_range, end_range + 1):
+            s = self.table.get_record_by_rid(rid).columns[aggregate_column_index]
+        if s:
+            return s
+        return 0
 
     """
     :param start_range: int         # Start of the key range to aggregate 
