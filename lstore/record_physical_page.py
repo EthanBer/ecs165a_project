@@ -10,7 +10,7 @@ class Record:
         self.indirection_column = indirection_column
         self.columns = columns
 
-    def __getitem__(self, key: int) -> int:
+    def __getitem__(self, key: int) -> int | None:
         # this syntax is used in the increment() function of query.py, so this operator should be implemented
         return self.columns[key]
 
@@ -31,7 +31,7 @@ class PhysicalPage:
         
         # Append the packed bytes to the bytearray
         self.data[self.offset : self.offset+8] = packed_data
-        self.offset += 8
+        self.offset += 8  
 
     
     def __get_nth_record__(self, record_idx: int) -> int:
@@ -43,7 +43,7 @@ class PhysicalPage:
         if (record_idx > num_records-1):
             return 0
         
-        value = struct.unpack('>Q', self.data[record_idx : record_idx+8])[0]
+        value = struct.unpack('>Q', self.data[(record_idx * 8) : (record_idx * 8)+8])[0]
 
         if (value != 0):
             #print("Value: ", value, "Index: ", record_idx)

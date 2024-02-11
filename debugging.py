@@ -60,7 +60,7 @@ query = Query(grades_table)
 # dictionary for records to test the database: test directory
 records = {}
 
-number_of_records = 2
+number_of_records = 3
 seed(3562901)
 
 for i in range(0, number_of_records):
@@ -73,5 +73,19 @@ for i in range(0, number_of_records):
     records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
     query.insert(*records[key])
     print(key, records)
-print("Insert finished")
+print("insert finished")
+# debugger_2(db)
+
+updated_records = {}
+for key in records:
+    updated_columns = [None, None, None, None, None]
+    updated_records[key] = records[key].copy()
+    for i in range(2, grades_table.num_columns):
+        # updated value
+        value = randint(0, 20)
+        updated_columns[i] = value
+        # update our test directory
+        updated_records[key][i] = value
+    query.update(key, *updated_columns)
+print(updated_records)
 debugger_2(db)

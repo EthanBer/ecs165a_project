@@ -108,6 +108,7 @@ class Query:
     def select(self, search_key: int, search_key_index: int | DataIndex, projected_columns_index: list[int | DataIndex]) -> list[Record]:
         search_key_index = DataIndex(search_key_index)
         projected_columns_index = [DataIndex(idx) for idx in projected_columns_index]
+        # self.table.page_ranges.
         return []
         pass
 
