@@ -1,4 +1,5 @@
 from lstore.ColumnIndex import DataIndex
+from lstore.config import config
 from lstore.table import Table
 
 class Database():
@@ -24,7 +25,7 @@ class Database():
     """
     def create_table(self, name : str, num_columns : int, key_index : int | DataIndex) -> Table:
         key_index = DataIndex(key_index)
-        table = Table(name, num_columns, key_index)
+        table = Table(name, num_columns, key_index, config.PAGES_PER_PAGERANGE)
         self.tables.append(table)
         return table
 

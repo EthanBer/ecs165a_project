@@ -1,17 +1,18 @@
-class config:
-	
-	last_rid = 1
-	
-	INDIRECTION_COLUMN = 0
-	RID_COLUMN = 1
-	TIMESTAMP_COLUMN = 2
-	SCHEMA_ENCODING_COLUMN = 3
-	NULL_COLUMN = 4
+from lstore.ColumnIndex import RawIndex
 
-	NUM_METADATA_COL = 5
+
+class config:
+	INDIRECTION_COLUMN = RawIndex(0)
+	RID_COLUMN = RawIndex(1)
+	TIMESTAMP_COLUMN = RawIndex(2)
+	SCHEMA_ENCODING_COLUMN = RawIndex(3)
+	NULL_COLUMN = RawIndex(4)
+
 	NUM_METADATA_COL = 5
 	
 	INDENT = "    " # Use "\t"
+	PAGES_PER_PAGERANGE = 16
+	PACKING_FORMAT_STR = ">Q"
 
 	@staticmethod
 	def str_each_el(arr: list, delim: str="") -> str:
@@ -21,4 +22,10 @@ class config:
 		# 	s += el.__str__()
 		# return s
 
-	PAGES_PER_PAGERANGE = 16
+class Metadata:
+	def __init__(self, indirection_column: int | None, rid: int, timestamp: int, schema_encoding: int):
+		self.indirection_column = indirection_column
+		self.rid = rid
+		self.timestamp = timestamp
+		self.schema_encoding = schema_encoding
+

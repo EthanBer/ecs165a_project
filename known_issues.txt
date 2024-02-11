@@ -1,0 +1,2 @@
+- page range capacity not implemented
+- raise exception is used instead of return False

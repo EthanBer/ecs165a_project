@@ -1,7 +1,8 @@
 
 import random
+import struct
 from lstore.record_physical_page import Record, PhysicalPage, DataIndex, RawIndex
-from lstore.config import config
+from lstore.config import config, Metadata
 
 
 
@@ -47,26 +48,21 @@ class Page:
 
 
     # Returns -1 if there is no capacity in the page
-    def insert(self, timestamp: int, schema_encoding: int, indirection_column: int, key:int | None, *columns: int | None) -> int:
+    def insert(self, metadata: Metadata, *columns: int | None) -> int:
         # NOTE: should follow same format as records, should return RID of successful record
-        from lstore.base_tail_page import BasePage
-        if isinstance(self, BasePage):
-           assert key != None
-        record = Record(indirection_column, Page.last_rid, timestamp, schema_encoding, key, *columns)
 
         null_bitmask = 0
-        idx = 0
-        for column in columns:
+        for idx, column in enumerate(columns):
             if column is None:
-                null_bitmask = null_bitmask | (1 << (len(columns)-idx))
+                null_bitmask = null_bitmask | (1 << (len(columns)-idx-1))
         
         # Transform columns to a list to append the schema encoding and the indirection column
         print(columns)
         list_columns = list(columns)
-        list_columns.insert(config.INDIRECTION_COLUMN, indirection_column)
-        list_columns.insert(config.RID_COLUMN, config.last_rid)
-        list_columns.insert(config.TIMESTAMP_COLUMN, timestamp)
-        list_columns.insert(config.SCHEMA_ENCODING_COLUMN, schema_encoding)
+        list_columns.insert(config.INDIRECTION_COLUMN, metadata.indirection_column)
+        list_columns.insert(config.RID_COLUMN, metadata.rid)
+        list_columns.insert(config.TIMESTAMP_COLUMN, metadata.timestamp)
+        list_columns.insert(config.SCHEMA_ENCODING_COLUMN, metadata.schema_encoding)
         list_columns.insert(config.NULL_COLUMN, null_bitmask)
         columns = tuple(list_columns)
         print("COLUMNS with metadata")
@@ -79,9 +75,9 @@ class Page:
             self.physical_pages[i].insert(columns[i])
 
         self.num_records += 1
-        config.last_rid += 1
+        # config.last_rid += 1
         
-        return record.rid
+        return metadata.rid
 
     # def update(self):
     #     pass
@@ -98,4 +94,9 @@ class Page:
         for i in range(config.NUM_METADATA_COL, config.NUM_METADATA_COL + self.num_columns):
             columns.append(self.physical_pages[i].__get_nth_record__(record_idx))
         
-        return Record(indirection_column, rid, schema_encoding, self.key_index, *columns)
+        return Record(Metadata(indirection_column, rid, timestamp, schema_encoding), key_col, *columns)
+
+    def update_nth_record(self, record_idx: int, update_col_idx: RawIndex, new_val: int) -> bool:
+        self.physical_pages[update_col_idx].data[(record_idx * 8):(record_idx * 8)+8] = struct.pack(config.PACKING_FORMAT_STR, new_val)
+        assert self.physical_pages[update_col_idx].__get_nth_record__(record_idx) == new_val, "update nth record failed"
+        return self.physical_pages[update_col_idx].__get_nth_record__(record_idx) == new_val

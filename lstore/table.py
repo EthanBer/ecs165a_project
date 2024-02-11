@@ -1,5 +1,6 @@
 from time import time
 from typing import TypedDict
+from lstore.base_tail_page import BasePage
 from lstore.config import config
 from lstore.ColumnIndex import DataIndex
 
@@ -31,18 +32,20 @@ class Table:
     :param key: int             #Index of table key in columns
     """
 
-    def __init__(self, name: str, num_columns: int, key_index: int | DataIndex):
+    def __init__(self, name: str, num_columns: int, key_index: int | DataIndex, pages_per_range: int):
         self.name: str = name
         self.key_index = DataIndex(key_index)
         self.num_columns: int = num_columns
         self.page_directory: dict[int, PageDirectoryEntry] = {}
+        self.last_rid = 1
+        self.pages_per_range = pages_per_range
         # Page Directory:
         # {Rid: (Page, offset)}
         from lstore.index import Index
         self.index = Index(self)
 
         self.page_ranges: list[PageRange] = []
-        self.page_ranges.append(PageRange(self.num_columns, self.key_index))
+        self.page_ranges.append(PageRange(self.num_columns, self.key_index, self.pages_per_range))
     
     @property
     def page_range_str(self) -> str:
@@ -63,6 +66,8 @@ class Table:
         page_dir_entry = self.page_directory[rid]
         return page_dir_entry.page.get_nth_record(
                 page_dir_entry.offset)
+            
+    # def _update_record_by_id()
     # def __merge(self):
     #     print("merge is happening")
     #     pass
