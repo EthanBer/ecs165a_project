@@ -222,7 +222,7 @@ class Query:
                 schema_shift = 1 << (self.table.num_columns - i - 1)
                 if first_update:
                     tail_1_values[i] = base_record.columns[i]
-                    tail_1_schema_encoding |= schema_shift
+                    # tail_1_schema_encoding |= schema_shift
                 tail_schema_encoding |= schema_shift
 
         if first_update:
