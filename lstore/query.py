@@ -30,6 +30,7 @@ class Query:
     def delete(self, primary_key: int) -> bool:
         projected_columns_index = [1] * self.table.num_columns
         records = self.select(primary_key, self.table.key_index, projected_columns_index)
+        assert len(records) == 1, "only one record should be returned with primary key"
         record = records[0]
 
         if (len(records) == 0):
@@ -190,7 +191,6 @@ class Query:
         base_record = primary_key_matches[0]
         base_page_dir_entry = self.table.page_directory[base_record.rid]
         page_range = base_page_dir_entry.page_range
-        tail_page = page_range.tail_pages[-1]
         # self.insert_tail(tail_page, )
         
         tail_1_values: list[int | None] = []
