@@ -12,7 +12,7 @@ class PageRange:
 
     def append_tail_page(self, tail_page: TailPage) -> None:
         self.tail_pages.append(tail_page)
-        
+
     def __str__(self) -> str:
         return f"""
 {2 * config.INDENT}PageRange:

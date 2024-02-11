@@ -71,11 +71,7 @@ class Query:
 
         page = None
         page_range = None
-        if len(self.table.page_directory) == 0:
-            page = BasePage(self.table.num_columns, self.table.key_index)
-            page_range = self.table.page_ranges[0]
-            self.table.page_ranges[0].base_pages.append(page)
-        elif not self.table.page_ranges[-1].base_pages[-1].has_capacity():
+        if not self.table.page_ranges[-1].base_pages[-1].has_capacity():
             page = BasePage(self.table.num_columns, self.table.key_index)
             page_range = self.table.page_ranges[-1]
             self.table.page_ranges[-1].base_pages.append(page)
@@ -93,7 +89,7 @@ class Query:
             timestamp, schema_encoding, 0, self.table.key_index, *columns)
 
 
-        page_directory_entry=PageDirectoryEntry(page, page.num_records)
+        page_directory_entry=PageDirectoryEntry(page_range, page, page.num_records)
         self.table.page_directory[rid] = page_directory_entry
 
         #self.table.index.update_index()
@@ -148,8 +144,8 @@ class Query:
         assert len(primary_key_matches) == 1
         # select indirection and rid columns
         base_record = primary_key_matches[0]
-        # page_range = self.table.page_directory[base_record.rid].page.page_range
-        # tail_page = page_range.tail_pages[-1]
+        page_range = self.table.page_directory[base_record.rid].page_range
+        tail_page = page_range.tail_pages[-1]
         first_update = False
         tail_1_values: list[int | None] = []
         tail_1_indirection: int = 0
@@ -183,8 +179,8 @@ class Query:
                 tail_schema_encoding |= (1 << i)
 
         if first_update:
-            tail_indirection = tail_page.insert(
-                tail_1_indirection, tail_1_schema_encoding, tail_1_values)
+            tail_indirection = tail_page.insert(int(time.time()), 
+                tail_1_schema_encoding, tail_1_indirection, None, *tail_1_values)
         else:
             tail_indirection = base_record.rid
             if last_update_rid:
@@ -192,14 +188,14 @@ class Query:
             else:
                 assert False, "brh"
 
-            prev_schema_encoding = get_record_by_rid(last_update_rid)
+            prev_schema_encoding = self.table.get_record_by_rid(last_update_rid).schema_encoding
 
             # prev_schema_encoding = last_update_page_dir_entry["page"].get_nth_record(
             #     last_update_page_dir_entry["offset"]).schema_encoding
             tail_schema_encoding |= prev_schema_encoding
 
-        tail_page.insert(tail_indirection,
-                         tail_schema_encoding, updated_columns)
+        tail_page.insert(int(time.time()), tail_schema_encoding,
+                         tail_indirection, None, *updated_columns)
         return True
 
         # tail_1_indirection = rid if first_update else last_update_rid

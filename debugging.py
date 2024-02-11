@@ -9,35 +9,35 @@ def debugger_2(db: Database) -> None:
         print(table)
 
 
-def debugger(db : Database) -> None:
+# def debugger(db : Database) -> None:
 
-    for i in range(len(db.tables)):
-        table = db.tables[i]
+#     for i in range(len(db.tables)):
+#         table = db.tables[i]
 
-        print("Table Name: ", table.name)
-        print("Page Directory: ")
-        print(table.page_directory)
+#         print("Table Name: ", table.name)
+#         print("Page Directory: ")
+#         print(table.page_directory)
         
-        for j in range(len(table.page_ranges)):
-            print("Current page range", j)
+#         for j in range(len(table.page_ranges)):
+#             print("Current page range", j)
 
-            #Printing base pages of the current page_range
-            print("Base Pages:")
-            for k in range(len(table.page_ranges[j].base_pages)):
-                current_base_page = table.page_ranges[j].base_pages[k]
+#             #Printing base pages of the current page_range
+#             print("Base Pages:")
+#             for k in range(len(table.page_ranges[j].base_pages)):
+#                 current_base_page = table.page_ranges[j].base_pages[k]
 
-                #Printing physical pages of the current base page
-                for l in range(len(current_base_page.physical_pages)):
-                    print(current_base_page.physical_pages[l].data)
+#                 #Printing physical pages of the current base page
+#                 for l in range(len(current_base_page.physical_pages)):
+#                     print(current_base_page.physical_pages[l].data)
 
 
-            #Printing tail pages of the current page_range
-            print("Tail Pages:")
-            for k in range(len(table.page_ranges[j].tail_pages)):
-                current_tail_page = table.page_ranges[j].tail_pages[k]
-                #Printing physical pages of the current tail page
-                for l in range(len(current_tail_page.physical_pages)):
-                    print(current_tail_page.physical_pages[l].data)
+#             #Printing tail pages of the current page_range
+#             print("Tail Pages:")
+#             for k in range(len(table.page_ranges[j].tail_pages)):
+#                 current_tail_page = table.page_ranges[j].tail_pages[k]
+#                 #Printing physical pages of the current tail page
+#                 for l in range(len(current_tail_page.physical_pages)):
+#                     print(current_tail_page.physical_pages[l].data)
 
 
 

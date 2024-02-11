@@ -3,7 +3,7 @@ from lstore.ColumnIndex import DataIndex, RawIndex
 
 
 class Record:
-    def __init__(self, indirection_column: int, rid :int, timestamp: int, schema_encoding: int, key: int, *columns : int):
+    def __init__(self, indirection_column: int, rid :int, timestamp: int, schema_encoding: int, key: int | None, *columns : int | None):
         self.rid = rid
         self.key = key
         self.schema_encoding = schema_encoding
@@ -47,8 +47,7 @@ class PhysicalPage:
 
         if (value != 0):
             #print("Value: ", value, "Index: ", record_idx)
-            print("num records: ", num_records)
-            print("offset: ", self.offset)
+            # print("num records: ", num_records) print("offset: ", self.offset)
             pass
 
         return value

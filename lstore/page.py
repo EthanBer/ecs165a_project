@@ -51,9 +51,17 @@ class Page:
 
 
     # Returns -1 if there is no capacity in the page
-    def insert(self, timestamp: int, schema_encoding: int, indirection_column: int, key:int, *columns: int | None) -> int:
+    def insert(self, timestamp: int, schema_encoding: int, indirection_column: int, key:int | None, *columns: int | None) -> int:
         # NOTE: should follow same format as records, should return RID of successful record
+<<<<<<< Updated upstream
         record = Record(indirection_column, Page.last_rid, schema_encoding, key, *columns)
+=======
+        last_rid = 0
+        from lstore.base_tail_page import BasePage
+        if isinstance(self, BasePage):
+           assert key != None
+        record = Record(indirection_column, last_rid, timestamp, schema_encoding, key, *columns)
+>>>>>>> Stashed changes
 
         null_bitmask = 0
         idx = 0
