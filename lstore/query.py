@@ -100,8 +100,8 @@ class Query:
         schema_encoding = 0
         timestamp = int(time.time())
 
-        page: BasePage
-        page_range: PageRange 
+        page: BasePage | None = None
+        page_range: PageRange | None = None
         if not self.table.page_ranges[-1].base_pages[-1].has_capacity(): # the last page of the page range is full
             if not self.table.page_ranges[-1].has_capacity(): # the page range can't handle another page, so make a new range. this range implicitly makes a new page as well
                 self.table.page_ranges.append(PageRange(self.table.num_columns, self.table.key_index, self.table.pages_per_range))
@@ -112,6 +112,9 @@ class Query:
         else: # the last page of the range can fit another record. don't do any new allocation.
             page = self.table.page_ranges[-1].base_pages[-1]
             page_range = self.table.page_ranges[-1]
+
+        if page is None or page_range is None:
+            return False
 
         rid = self.table.page_ranges[-1].base_pages[-1].insert(Metadata(None, self.table.last_rid, timestamp, schema_encoding), *columns)
         
