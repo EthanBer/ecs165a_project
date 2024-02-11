@@ -1,4 +1,7 @@
 class config:
+	
+	last_rid = 1
+	
 	INDIRECTION_COLUMN = 0
 	RID_COLUMN = 1
 	TIMESTAMP_COLUMN = 2

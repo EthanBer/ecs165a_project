@@ -43,12 +43,6 @@ def debugger_2(db: Database) -> None:
 
 
 
-
-
-
-
-
-
 db = Database()
 # Create a table  with 5 columns
 #   Student Id and 4 grades

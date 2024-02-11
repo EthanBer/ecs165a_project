@@ -5,11 +5,7 @@ from lstore.config import config
 
 
 
-
-
 class Page:
-    #global last_rid
-    last_rid = 1
     def __init__(self, num_columns: int, key_index : DataIndex):
         self.key_index = key_index
         self.id = random.randrange(1, int(1e10))    # This ID is just for debugging purposes
@@ -73,7 +69,7 @@ class Page:
         print(columns)
         list_columns = list(columns)
         list_columns.insert(config.INDIRECTION_COLUMN, indirection_column)
-        list_columns.insert(config.RID_COLUMN, Page.last_rid)
+        list_columns.insert(config.RID_COLUMN, config.last_rid)
         list_columns.insert(config.TIMESTAMP_COLUMN, timestamp)
         list_columns.insert(config.SCHEMA_ENCODING_COLUMN, schema_encoding)
         list_columns.insert(config.NULL_COLUMN, null_bitmask)
@@ -88,14 +84,12 @@ class Page:
             self.physical_pages[i].insert(columns[i])
 
         self.num_records += 1
-        Page.last_rid += 1
-
+        config.last_rid += 1
+        
         return record.rid
 
     # def update(self):
     #     pass
-        
-
 
     def get_nth_record(self, record_idx: int) -> Record:
         # get record at idx n of this page
