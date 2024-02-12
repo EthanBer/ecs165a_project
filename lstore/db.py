@@ -23,8 +23,8 @@ class Database():
     :param num_columns: int     #Number of Columns: all columns are integer
     :param key_index: int             #Index of table key in columns
     """
-    def create_table(self, name : str, num_columns : int, key_index : int | DataIndex) -> Table:
-        key_index = DataIndex(key_index)
+    def create_table(self, name : str, num_columns : int, key_index : DataIndex) -> Table:
+        # key_index = DataIndex(key_index)
         table = Table(name, num_columns, key_index, config.PAGES_PER_PAGERANGE)
         self.tables.append(table)
         return table

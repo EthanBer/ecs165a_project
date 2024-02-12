@@ -1,6 +1,7 @@
 from lstore.ColumnIndex import DataIndex
 from lstore.base_tail_page import BasePage, TailPage
 from lstore.config import config
+from lstore.helper import helper
 
 class PageRange:
     def __init__(self, num_columns: int, key_col: DataIndex, pages_per_range: int):
@@ -23,5 +24,5 @@ class PageRange:
     def __str__(self) -> str:
         return f"""
 {2 * config.INDENT}PageRange:
-{3 * config.INDENT}base_pages:{config.str_each_el(self.base_pages)}
-{3 * config.INDENT}tail_pages:{config.str_each_el(self.tail_pages)}"""
+{3 * config.INDENT}base_pages:{helper.str_each_el(self.base_pages)}
+{3 * config.INDENT}tail_pages:{helper.str_each_el(self.tail_pages)}"""

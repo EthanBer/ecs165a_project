@@ -1,8 +1,9 @@
 from time import time
 from typing import TypedDict
+from lstore.helper import helper
 from lstore.base_tail_page import BasePage
 from lstore.config import config
-from lstore.ColumnIndex import DataIndex
+from lstore.ColumnIndex import DataIndex, RawIndex
 
 from lstore.page import Page
 from lstore.page_range import PageRange
@@ -32,10 +33,11 @@ class Table:
     :param key: int             #Index of table key in columns
     """
 
-    def __init__(self, name: str, num_columns: int, key_index: int | DataIndex, pages_per_range: int):
+    def __init__(self, name: str, num_columns: int, key_index: DataIndex, pages_per_range: int):
         self.name: str = name
-        self.key_index = DataIndex(key_index)
-        self.num_columns: int = num_columns
+        self.key_index = key_index
+        self.num_columns: int = num_columns # data columns only
+        self.total_columns = self.num_columns + config.NUM_METADATA_COL # inclding metadata
         self.page_directory: dict[int, PageDirectoryEntry] = {}
         self.last_rid = 1
         self.pages_per_range = pages_per_range
@@ -47,9 +49,12 @@ class Table:
         self.page_ranges: list[PageRange] = []
         self.page_ranges.append(PageRange(self.num_columns, self.key_index, self.pages_per_range))
     
+    def ith_total_col_shift(self, col_idx: RawIndex) -> int: # returns the bit vector shifted to the indicated col idx
+        return 0b1 << (self.total_columns - col_idx - 1)
+
     @property
     def page_range_str(self) -> str:
-        return config.str_each_el(self.page_ranges)
+        return helper.str_each_el(self.page_ranges)
 
     @property
     def page_directory_str(self) -> str:

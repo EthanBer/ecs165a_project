@@ -1,10 +1,12 @@
-from lstore.ColumnIndex import DataIndex
+from typing import Literal
+from lstore.ColumnIndex import DataIndex, RawIndex
 from lstore.table import PageDirectoryEntry, Table, Record
 from lstore.index import Index
 from lstore.page import Page
 from lstore.base_tail_page import BasePage, TailPage
 import time
 from lstore.config import Metadata, config
+from lstore.helper import helper
 import struct
 from lstore.page_range import PageRange
 
@@ -28,6 +30,7 @@ class Query:
     """
 
     def delete(self, primary_key: int) -> bool:
+        """
         projected_columns_index = [1] * self.table.num_columns
         records = self.select(primary_key, self.table.key_index, projected_columns_index)
         assert len(records) == 1, "only one record should be returned with primary key"
@@ -55,8 +58,18 @@ class Query:
             # Append the packed bytes to the bytearray
             page.physical_pages[config.NULL_COLUMN].data[offset*8:offset*8+8] = packed_data
             indirection_column = struct.unpack('>Q', page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]
+        """
+        return self.update(primary_key, *([None] * self.table.num_columns), True) 
+        # bitmask = 1 << (self.table.num_columns - config.RID_COLUMN - 1)
+        # page_dir_entry = self.table.page_directory[record.rid]
+        # page = page_dir_entry.page
+        # offset = page_dir_entry.offset
+        # page.physical_pages[config.NULL_COLUMN].data[offset*8:offset*8+8] = packed_data
+        # indirection_column = struct.unpack('>Q', page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]
+        # packed_data = struct.pack('>Q', bitmask)
 
-        return True
+        # return 
+
         
 
     def insert_tail(self, page_range: PageRange, indirection_column: int, schema_encoding: int, *columns: int | None) -> int: # returns RID if successful
@@ -67,7 +80,8 @@ class Query:
             tail_page = TailPage(self.table.num_columns, self.table.key_index)
             page_range.tail_pages.append(tail_page)
 
-        rid = tail_page.insert(Metadata(indirection_column, self.table.last_rid, timestamp, schema_encoding), *columns)
+        key_null_bitmask = self.table.ith_total_col_shift(self.table.key_index.toRawIndex()) # this value for the null column makes the key column null
+        rid = tail_page.insert(Metadata(indirection_column, self.table.last_rid, timestamp, schema_encoding, key_null_bitmask), *columns)
 
         if rid == -1:
             raise(Exception("insert tail failed"))
@@ -97,7 +111,7 @@ class Query:
     """
 
     def insert(self, *columns: int | None) -> bool:
-        schema_encoding = 0
+        schema_encoding = 0b0
         timestamp = int(time.time())
 
         page: BasePage | None = None
@@ -116,7 +130,8 @@ class Query:
         if page is None or page_range is None:
             return False
 
-        rid = self.table.page_ranges[-1].base_pages[-1].insert(Metadata(None, self.table.last_rid, timestamp, schema_encoding), *columns)
+        # the null column in this Metadata object won't be used by the page insert.
+        rid = self.table.page_ranges[-1].base_pages[-1].insert(Metadata(None, self.table.last_rid, timestamp, schema_encoding, None), *columns)
         
         # if rid == -1:
         #     self.table.page_ranges.append(PageRange(self.table.num_columns, self.table.key_index))
@@ -142,9 +157,9 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
 
-    def select(self, search_key: int, search_key_index: int | DataIndex, projected_columns_index: list[int | DataIndex]) -> list[Record]:
-        search_key_index = DataIndex(search_key_index)
-        projected_columns_index = [DataIndex(idx) for idx in projected_columns_index]
+    def select(self, search_key: int, search_key_index: DataIndex, projected_columns_index: list[Literal[0] | Literal[1]]) -> list[Record]:
+        # search_key_index = DataIndex(search_key_index)
+        # projected_columns_index = [DataIndex(idx) for idx in projected_columns_index]
 
         ret: list[Record] = []
         for rid in range(1, self.table.last_rid):
@@ -154,9 +169,23 @@ class Query:
                 for i, col in enumerate(col_list):
                     if projected_columns_index[i] == 0:
                         col_list[i] = None 
+                    else:
+                        schema_encoding = rec.schema_encoding
+                        if helper.ith_bit(schema_encoding, self.table.num_columns, i, False) == 0b1: # check if the column has been updated. 
+                            print("detected on schema encoding bit")
+                            assert rec.indirection_column is not None, "inconsistent state: schema_encoding bit on but indirection was None"
+                            curr = rec.indirection_column 
+                            while self.table.get_record_by_rid(curr).columns[i] is None:
+                                temp = self.table.get_record_by_rid(curr).indirection_column
+                                assert temp is not None
+                                curr = temp
+                                
+
+                            col_list[i] = self.table.get_record_by_rid(rec.indirection_column)[i]
                         # rec.columns[i] = None  # filter out that column from the projection
                 rec.columns = tuple(col_list)
-                ret.append(rec)
+                if rec.rid != None:
+                    ret.append(rec)
         # self.table.page_ranges.
         return ret 
 
@@ -181,15 +210,15 @@ class Query:
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
 
-    def update(self, primary_key: int, *columns: int) -> bool:
+    def update(self, primary_key: int, *columns: int | None, delete: bool = False) -> bool:
         assert len(
-            columns) == self.table.num_columns, "len(columns) must be equal to number of columns in table"
+            columns) == self.table.num_columns, f"len(columns) must be equal to number of columns in table; argument had length {len(columns)} but expected {self.table.num_columns} length"
         if len(columns) != self.table.num_columns:
             return False
         primary_key_matches = self.select(primary_key, self.table.key_index, [1] * len(columns))
-        if len(primary_key_matches) == 0:
+        if len(primary_key_matches) != 1:
             return False
-        assert len(primary_key_matches) == 1 # primary key results in ONE select result
+        # assert len(primary_key_matches) == 1 # primary key results in ONE select result
         # select indirection and rid columns
         base_record = primary_key_matches[0]
         base_page_dir_entry = self.table.page_directory[base_record.rid]
@@ -198,59 +227,92 @@ class Query:
         
         tail_1_values: list[int | None] = []
         tail_1_indirection: int = 0
-        tail_1_schema_encoding: int = 0
+        tail_1_schema_encoding: int = 0b0
         tail_indirection: int
         first_update = False
 
-        if base_record.indirection_column is None:  # this record hasn't been updated before
-            first_update = True
-            # will set the key to none, wherever it is
-            tail_1_values = [None] * len(columns)
-            tail_1_indirection = base_record.rid
-            # the first bit is a flag, specifying whether this tail record is a snapshot of original base page values or an updated value
-            tail_1_schema_encoding = 1 << self.table.num_columns # ..for now. we also need to take into account which columns were updated
+        if not delete:
+            if base_record.indirection_column is None:  # this record hasn't been updated before
+                first_update = True
+                # will set the key to none, wherever it is
+                tail_1_values = [None] * len(columns)
+                tail_1_indirection = base_record.rid
+                # the first bit is a flag, specifying whether this tail record is a snapshot of original base page values or an updated value
+                tail_1_schema_encoding = 0b1 << self.table.num_columns # ..for now. we also need to take into account which columns were updated
+            else:
+                tail_indirection = base_record.indirection_column
+                # new_record_values.append([])
+                # ... put tail record
+            tail_schema_encoding = 0  # ..for now. we need to take into account updated columns
+            # if not tail_page.has_capacity(2 if first_update else 1):
+            #     tail_page = TailPage(page_range, page_range.num_columns)
+            #     page_range.append_tail_page(tail_page)
+
+            updated_columns: list[int | None] = [None] * self.table.num_columns
+            for i, column in enumerate(columns):
+                if column is not None:
+                    updated_columns[i] = column
+                    schema_shift = helper.ith_total_col_shift(self.table.num_columns, i, False)
+                    # schema_shift = 1 << (self.table.num_columns - i - 1)
+                    if first_update:
+                        tail_1_values[i] = base_record.columns[i]
+                        # tail_1_schema_encoding |= schema_shift
+                    tail_schema_encoding |= schema_shift
+
+            if first_update:
+                tail_indirection = self.insert_tail(page_range, tail_1_indirection, tail_1_schema_encoding, *tail_1_values)
+            else:
+                if not isinstance(base_record.indirection_column, int): return False
+                tail_indirection = base_record.indirection_column
+                # if last_update_rid:
+                #     last_update_page_dir_entry = self.table.page_directory[last_update_rid]
+                # se:
+                #     assert False, "brh"
+
+                prev_schema_encoding = self.table.get_record_by_rid(tail_indirection).schema_encoding
+
+                # prev_schema_encoding = last_update_page_dir_entry["page"].get_nth_record(
+                #     last_update_page_dir_entry["offset"]).schema_encoding
+                tail_schema_encoding |= prev_schema_encoding # if first_update, these two should be the same. but if not then it might change
+
+
         else:
-            tail_indirection = base_record.indirection_column
-            # new_record_values.append([])
-            # ... put tail record
-        tail_schema_encoding = 0  # ..for now. we need to take into account updated columns
-        # if not tail_page.has_capacity(2 if first_update else 1):
-        #     tail_page = TailPage(page_range, page_range.num_columns)
-        #     page_range.append_tail_page(tail_page)
+            tail_schema_encoding = 0b0
+            tail_indirection = base_record.rid
 
-        updated_columns: list[int | None] = [None] * self.table.num_columns
-        for i, column in enumerate(columns):
-            if column is not None:
-                updated_columns[i] = column
-                schema_shift = 1 << (self.table.num_columns - i - 1)
-                if first_update:
-                    tail_1_values[i] = base_record.columns[i]
-                    # tail_1_schema_encoding |= schema_shift
-                tail_schema_encoding |= schema_shift
+            # curr = tail_indirection
+            bitmask = self.table.ith_total_col_shift(config.RID_COLUMN)
+            # bitmask = 1 << (self.table.total_columns - config.RID_COLUMN - 1) # this will go into the NULL_COLUMN; ie we are setting the RID to null
+            # packed_data = struct.pack('>Q', bitmask)
+            # # Append the packed bytes to the bytearray
+            # page.physical_pages[config.NULL_COLUMN].data[offset*8:offset*8+8] = packed_data
+            # indirection_column = struct.unpack('>Q', page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]
+            tmp_indirection_col: int | None = base_record.indirection_column
 
-        if first_update:
-            tail_indirection = self.insert_tail(page_range, tail_1_indirection, tail_1_schema_encoding, *tail_1_values)
-        else:
-            if not isinstance(base_record.indirection_column, int): return False
-            tail_indirection = base_record.indirection_column
-            # if last_update_rid:
-            #     last_update_page_dir_entry = self.table.page_directory[last_update_rid]
-            # se:
-            #     assert False, "brh"
+            if tmp_indirection_col is not None:
+                while True:
+                    base_dir_entry = self.table.page_directory[tmp_indirection_col]
+                    page = base_dir_entry.page
+                    offset = base_dir_entry.offset
 
-            prev_schema_encoding = self.table.get_record_by_rid(tail_indirection).schema_encoding
-
-            # prev_schema_encoding = last_update_page_dir_entry["page"].get_nth_record(
-            #     last_update_page_dir_entry["offset"]).schema_encoding
-            tail_schema_encoding |= prev_schema_encoding # if first_update, these two should be the same. but if not then it might change
-
+                    # packed_data = struct.pack(config.PACKING_FORMAT_STR, bitmask)
+                    # Append the packed bytes to the bytearray
+                    page.update_nth_record(offset, config.NULL_COLUMN, bitmask) # the other bits in the null column no longer matter because they are deleted
+                    if isinstance(base_dir_entry, BasePage):
+                        break
+                    # page.physical_pages[config.NULL_COLUMN].data[offset*8:offset*8+8] = packed_data
+                    tmp_indirection_col = helper.unpack_col(page, config.INDIRECTION_COLUMN, offset)
+                    # tmp_indirection_col = struct.unpack(config.PACKING_FORMAT_STR, page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]
+            else:
+                base_dir_entry = self.table.page_directory[base_record.rid]
+                base_dir_entry.page.update_nth_record(base_dir_entry.offset, config.NULL_COLUMN, bitmask)
 
         base_indirection = self.insert_tail(page_range, tail_indirection, tail_schema_encoding, *updated_columns)
         success = base_page_dir_entry.page.update_nth_record(base_page_dir_entry.offset, config.INDIRECTION_COLUMN, base_indirection)
         assert success, "update not successful"
-
-        return success # True if update was successful
-
+        success = base_page_dir_entry.page.update_nth_record(base_page_dir_entry.offset, config.SCHEMA_ENCODING_COLUMN, tail_schema_encoding)
+        assert success, "update not successful"
+        return success
         # tail_1_indirection = rid if first_update else last_update_rid
 
         # if first update,
@@ -292,13 +354,16 @@ class Query:
     # Returns False if no record exists in the given range
     """
 
-    def sum(self, start_range, end_range, aggregate_column_index):
-        s = 0
+    def sum(self, start_range: int, end_range: int, aggregate_column_index: DataIndex) -> int | bool:
+        # TODO: fix
+        """
         for rid in range(start_range, end_range + 1):
+        s = 0
             s = self.table.get_record_by_rid(rid).columns[aggregate_column_index]
         if s:
             return s
-        return 0
+        """
+        return False
 
     """
     :param start_range: int         # Start of the key range to aggregate 
@@ -310,8 +375,9 @@ class Query:
     # Returns False if no record exists in the given range
     """
 
-    def sum_version(self, start_range, end_range, aggregate_column_index, relative_version):
-        pass
+    def sum_version(self, start_range: int, end_range: int, aggregate_column_index: DataIndex, relative_version: int) -> int | bool:
+        # TODO: implement
+        return False
 
     """
     incremenets one column of the record
@@ -322,11 +388,15 @@ class Query:
     # Returns False if no record matches key or if target record is locked by 2PL.
     """
 
-    def increment(self, key, column):
+    def increment(self, key: int, column: DataIndex) -> bool:
         r = self.select(key, self.table.key_index, [1] * self.table.num_columns)[0]
         if r is not False:
-            updated_columns = [None] * self.table.num_columns
-            updated_columns[column] = r[column] + 1
+            updated_columns: list[int | None] = [None] * self.table.num_columns
+            to_add: int = 0
+            rec_col = r[column]
+            if rec_col is not None: 
+                to_add = rec_col
+            updated_columns[column] = to_add + 1
             u = self.update(key, *updated_columns)
             return u
         return False

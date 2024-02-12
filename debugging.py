@@ -1,4 +1,6 @@
+from lstore.ColumnIndex import DataIndex
 from lstore.db import Database
+from lstore.helper import helper
 from lstore.query import Query
 from random import choice, randint, sample, seed
 
@@ -50,7 +52,7 @@ db = Database()
 #   The second argument is the number of columns
 #   The third argument is determining the which columns will be primay key
 #       Here the first column would be student id and primary key
-grades_table = db.create_table('Grades', 5, 0)
+grades_table = db.create_table('Grades', 5, DataIndex(0))
 
 # create a query class for the grades table
 query = Query(grades_table)
@@ -59,6 +61,7 @@ query = Query(grades_table)
 
 # dictionary for records to test the database: test directory
 records = {}
+keys = []
 
 number_of_records = 1
 seed(3562901)
@@ -71,6 +74,7 @@ for i in range(0, number_of_records):
         key = 92106429 + randint(0, number_of_records)
 
     records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
+    keys.append(key)
     query.insert(*records[key])
     print(key, records)
 print("insert finished")
@@ -80,7 +84,7 @@ print(db.tables[0].get_record_by_rid(1))
 
 updated_records = {}
 for key in records:
-    updated_columns = [None, None, None, None, None]
+    updated_columns: list[int | None] = [None, None, None, None, None]
     updated_records[key] = records[key].copy()
     for i in range(2, grades_table.num_columns):
         # updated value
@@ -88,6 +92,7 @@ for key in records:
         updated_columns[i] = value
         # update our test directory
         updated_records[key][i] = value
+    print(f"columns should be updated to {updated_columns}")
     query.update(key, *updated_columns)
 print("update finished. records:")
 print(updated_records)
@@ -95,3 +100,6 @@ print(updated_records)
 print(db.tables[0].get_record_by_rid(1))
 print(db.tables[0].get_record_by_rid(2))
 print(db.tables[0].get_record_by_rid(3))
+
+print(helper.str_each_el( query.select(keys[0], DataIndex(0), [1] * 5) ))
+# print(f"delete successful, key: {keys[0]}" if query.delete(keys[0]) else "delete failed")

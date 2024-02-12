@@ -1,7 +1,6 @@
 import struct
-from typing import Type
-from lstore.ColumnIndex import DataIndex, RawIndex
 from lstore.config import Metadata, config
+from lstore.helper import helper
 
 
 class Record:
@@ -18,6 +17,8 @@ class Record:
         return self.columns[key]
 
     def __str__(self) -> str:
+        # NOTE: the self.columns is just the physical values in the columns. 
+        # if the physical value is 0, the actual value could be 0 or None depending on the corresponding NULL_COLUMN value
         return f"Record RID{self.rid}; idr:{self.indirection_column}; senc:{bin(self.schema_encoding)}; key:{self.key}; columns:{self.columns}"
 
 
@@ -50,7 +51,8 @@ class PhysicalPage:
             # raise(Exception("get nth record read fail: out of bounds index"))
             return None # TODO: fix?
         
-        value = struct.unpack(config.PACKING_FORMAT_STR, self.data[(record_idx * 8) : (record_idx * 8)+8])[0]
+        # value = struct.unpack(config.PACKING_FORMAT_STR, self.data[(record_idx * 8) : (record_idx * 8)+8])[0]
+        value = helper.unpack_data(self.data, record_idx)
 
 
 

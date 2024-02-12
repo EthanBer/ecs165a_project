@@ -1,8 +1,10 @@
 
 import random
 import struct
-from lstore.record_physical_page import Record, PhysicalPage, DataIndex, RawIndex
+from lstore.record_physical_page import Record, PhysicalPage
+from lstore.ColumnIndex import DataIndex, RawIndex
 from lstore.config import config, Metadata
+from lstore.helper import helper
 
 
 
@@ -39,7 +41,7 @@ class Page:
         newline = "\n"
         return f"""
 {4 * config.INDENT}{self.high_level_str}; key_index:{self.key_index}; num_records:{self.num_records}; num_columns:{self.num_columns}
-{5 * config.INDENT}physical_pages:{config.str_each_el(self.physical_pages, newline + (5 * config.INDENT) + (15 * " "))}"""
+{5 * config.INDENT}physical_pages:{helper.str_each_el(self.physical_pages, newline + (5 * config.INDENT) + (15 * " "))}"""
 
     def has_capacity(self, n: int=1) -> bool:
         # if self.num_records
@@ -55,12 +57,14 @@ class Page:
         total_cols = len(columns) + config.NUM_METADATA_COL
         if metadata.indirection_column == None: # set 1 for null indirection column
             print("setting indirection null bit")
-            null_bitmask = 1 << (total_cols - 1)
+            null_bitmask = helper.ith_total_col_shift(total_cols, config.INDIRECTION_COLUMN)
+            # null_bitmask = 1 << (total_cols - 1)
         for idx, column in enumerate(columns):
             print(f"checking cols for null... {column}")
             if column is None:
                 print("found a null col")
-                null_bitmask = null_bitmask | (1 << (len(columns)-idx-1))
+                null_bitmask = null_bitmask | helper.ith_total_col_shift(len(columns), idx, False) 
+                # null_bitmask = null_bitmask | (1 << (len(columns)-idx-1))
             
         print(f"inserting null bitmask {bin(null_bitmask)}")
         
@@ -98,29 +102,33 @@ class Page:
             # print("getting checking null")
             if val == 0:
                 # breaking an abstraction barrier for convenience right now. TODO: fix?
-                thing = struct.unpack(config.PACKING_FORMAT_STR, self.physical_pages[config.NULL_COLUMN].data[(record_idx * 8):(record_idx * 8)+8])[0]
+                thing = helper.unpack_col(self, config.NULL_COLUMN, record_idx)
+                # thing = struct.unpack(config.PACKING_FORMAT_STR, self.physical_pages[config.NULL_COLUMN].data[(record_idx * 8):(record_idx * 8)+8])[0]
                 # is_none = (self.physical_pages[config.NULL_COLUMN].data[(record_idx * 8):(record_idx * 8)+8] == b'x01')
-                is_none = ( thing >> ( self.num_columns + config.NUM_METADATA_COL - col_idx - 1 ) ) & 1
+
+                # is_none = ( thing >> ( self.num_columns + config.NUM_METADATA_COL - col_idx - 1 ) ) & 1
+                is_none = helper.ith_bit(thing, self.num_columns + config.NUM_METADATA_COL, col_idx)
                 if is_none == 1:
                     print("set some value to None")
                     val = None
             return val
 
-        indirection_column, rid, schema_encoding, timestamp, key_col = \
+        indirection_column, rid, schema_encoding, timestamp, key_col, null_col = \
             get_check_for_none(config.INDIRECTION_COLUMN, record_idx), \
             get_check_for_none(config.RID_COLUMN, record_idx), \
             get_check_for_none(config.SCHEMA_ENCODING_COLUMN, record_idx), \
             get_check_for_none(config.TIMESTAMP_COLUMN, record_idx), \
-            get_check_for_none(config.data_to_raw_idx(self.key_index), record_idx), \
+            get_check_for_none(helper.data_to_raw_idx(self.key_index), record_idx), \
+            get_check_for_none(config.NULL_COLUMN, record_idx)
         
-        if rid is None or timestamp is None or schema_encoding is None:
-            raise(Exception("rid or timestamp or schema_encoding was None when reading"))
+        if rid is None or timestamp is None or schema_encoding is None or null_col is None:
+            raise(Exception("rid or timestamp or schema_encoding or null_col was None when reading"))
         
         columns = []
         for i in range(config.NUM_METADATA_COL, config.NUM_METADATA_COL + self.num_columns):
             columns.append(self.physical_pages[i].__get_nth_record__(record_idx))
         
-        return Record(Metadata(indirection_column, rid, timestamp, schema_encoding), key_col, *columns)
+        return Record(Metadata(indirection_column, rid, timestamp, schema_encoding, null_col), key_col, *columns)
 
     def update_nth_record(self, record_idx: int, update_col_idx: RawIndex, new_val: int) -> bool:
         self.physical_pages[update_col_idx].data[(record_idx * 8):(record_idx * 8)+8] = struct.pack(config.PACKING_FORMAT_STR, new_val)
