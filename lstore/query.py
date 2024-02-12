@@ -60,7 +60,7 @@ class Query:
             page.physical_pages[config.NULL_COLUMN].data[offset*8:offset*8+8] = packed_data
             indirection_column = struct.unpack('>Q', page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]
         """
-        return self.update(primary_key, *([None] * self.table.num_columns), True)
+        return self.update(primary_key, True, *([None] * self.table.num_columns))
         # bitmask = 1 << (self.table.num_columns - config.RID_COLUMN - 1)
         # page_dir_entry = self.table.page_directory[record.rid]
         # page = page_dir_entry.page
@@ -239,7 +239,7 @@ class Query:
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
 
-    def update(self, primary_key: int, *columns: int | None, delete: bool = False) -> bool:
+    def update(self, primary_key: int, delete: bool = False, *columns: int | None) -> bool:
         assert len(
             columns) == self.table.num_columns, f"len(columns) must be equal to number of columns in table; argument had length {len(columns)} but expected {self.table.num_columns} length"
         if len(columns) != self.table.num_columns:
@@ -434,6 +434,6 @@ class Query:
             if rec_col is not None:
                 to_add = rec_col
             updated_columns[column] = to_add + 1
-            u = self.update(key, *updated_columns)
+            u = self.update(key, False, *updated_columns)
             return u
         return False
