@@ -10,6 +10,7 @@ from lstore.helper import helper
 import struct
 from lstore.page_range import PageRange
 
+
 class Query:
     """
     # Creates a Query object that can perform different queries on the specified table 
@@ -38,7 +39,7 @@ class Query:
 
         if (len(records) == 0):
             return False
-        
+
         tmp = self.table.page_directory[record.rid]
         page = tmp.page
         offset = tmp.offset
@@ -59,7 +60,7 @@ class Query:
             page.physical_pages[config.NULL_COLUMN].data[offset*8:offset*8+8] = packed_data
             indirection_column = struct.unpack('>Q', page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]
         """
-        return self.update(primary_key, *([None] * self.table.num_columns), True) 
+        return self.update(primary_key, *([None] * self.table.num_columns), True)
         # bitmask = 1 << (self.table.num_columns - config.RID_COLUMN - 1)
         # page_dir_entry = self.table.page_directory[record.rid]
         # page = page_dir_entry.page
@@ -68,23 +69,24 @@ class Query:
         # indirection_column = struct.unpack('>Q', page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]
         # packed_data = struct.pack('>Q', bitmask)
 
-        # return 
+        # return
 
-        
-
-    def insert_tail(self, page_range: PageRange, indirection_column: int, schema_encoding: int, *columns: int | None) -> int: # returns RID if successful
+    def insert_tail(self, page_range: PageRange, indirection_column: int, schema_encoding: int,
+                    *columns: int | None) -> int:  # returns RID if successful
         tail_page = page_range.tail_pages[-1]
         timestamp = int(time.time())
 
-        if not tail_page.has_capacity(): # the last page of the tail page range can't handle another record
+        if not tail_page.has_capacity():  # the last page of the tail page range can't handle another record
             tail_page = TailPage(self.table.num_columns, self.table.key_index)
             page_range.tail_pages.append(tail_page)
 
-        key_null_bitmask = self.table.ith_total_col_shift(self.table.key_index.toRawIndex()) # this value for the null column makes the key column null
-        rid = tail_page.insert(Metadata(indirection_column, self.table.last_rid, timestamp, schema_encoding, key_null_bitmask), *columns)
+        key_null_bitmask = self.table.ith_total_col_shift(
+            self.table.key_index.toRawIndex())  # this value for the null column makes the key column null
+        rid = tail_page.insert(
+            Metadata(indirection_column, self.table.last_rid, timestamp, schema_encoding, key_null_bitmask), *columns)
 
         if rid == -1:
-            raise(Exception("insert tail failed"))
+            raise (Exception("insert tail failed"))
             # return False
 
         page_directory_entry = PageDirectoryEntry(page_range, tail_page, tail_page.num_records - 1)
@@ -100,7 +102,7 @@ class Query:
         #     self.table.page_ranges.append(PageRange(self.table.num_columns, self.table.key_index))
         #     rid = self.table.page_ranges[-1].base_pages[-1].insert(Metadata(None, self.table.last_rid, timestamp, schema_encoding), *columns)
         # rid = self.table.page_ranges[-1].base_pages[-1].insert(Metadata(None, self.table.last_rid, timestamp, schema_encoding), *columns)
-        
+
         # if rid == -1:
         # pass
 
@@ -116,14 +118,16 @@ class Query:
 
         page: BasePage | None = None
         page_range: PageRange | None = None
-        if not self.table.page_ranges[-1].base_pages[-1].has_capacity(): # the last page of the page range is full
-            if not self.table.page_ranges[-1].has_capacity(): # the page range can't handle another page, so make a new range. this range implicitly makes a new page as well
-                self.table.page_ranges.append(PageRange(self.table.num_columns, self.table.key_index, self.table.pages_per_range))
-            else: # the last page of the range was full, but the page range can accomodate another page, so make one
+        if not self.table.page_ranges[-1].base_pages[-1].has_capacity():  # the last page of the page range is full
+            if not self.table.page_ranges[
+                -1].has_capacity():  # the page range can't handle another page, so make a new range. this range implicitly makes a new page as well
+                self.table.page_ranges.append(
+                    PageRange(self.table.num_columns, self.table.key_index, self.table.pages_per_range))
+            else:  # the last page of the range was full, but the page range can accomodate another page, so make one
                 page = BasePage(self.table.num_columns, self.table.key_index)
                 page_range = self.table.page_ranges[-1]
                 self.table.page_ranges[-1].base_pages.append(page)
-        else: # the last page of the range can fit another record. don't do any new allocation.
+        else:  # the last page of the range can fit another record. don't do any new allocation.
             page = self.table.page_ranges[-1].base_pages[-1]
             page_range = self.table.page_ranges[-1]
 
@@ -131,20 +135,24 @@ class Query:
             return False
 
         # the null column in this Metadata object won't be used by the page insert.
-        rid = self.table.page_ranges[-1].base_pages[-1].insert(Metadata(None, self.table.last_rid, timestamp, schema_encoding, None), *columns)
-        
+        rid = self.table.page_ranges[-1].base_pages[-1].insert(
+            Metadata(None, self.table.last_rid, timestamp, schema_encoding, None), *columns)
+
         # if rid == -1:
         #     self.table.page_ranges.append(PageRange(self.table.num_columns, self.table.key_index))
         #     rid = self.table.page_ranges[-1].base_pages[-1].insert(Metadata(None, self.table.last_rid, timestamp, schema_encoding), *columns)
 
         if rid == -1:
-            raise(Exception("insert failed"))
+            raise (Exception("insert failed"))
 
-        page_directory_entry=PageDirectoryEntry(page_range, page, page.num_records - 1)
+        page_directory_entry = PageDirectoryEntry(page_range, page, page.num_records - 1)
         self.table.page_directory[rid] = page_directory_entry
         self.table.last_rid += 1
 
-        #self.table.index.update_index()
+        self.table.index.update_index(self.table.key_index,
+                                      columns[self.table.key_index],
+                                      rid)
+
         return True
 
     """
@@ -157,37 +165,49 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
 
-    def select(self, search_key: int, search_key_index: DataIndex, projected_columns_index: list[Literal[0] | Literal[1]]) -> list[Record]:
+    def select(self, search_key: int, search_key_index: DataIndex,
+               projected_columns_index: list[Literal[0] | Literal[1]]) -> list[Record]:
         # search_key_index = DataIndex(search_key_index)
         # projected_columns_index = [DataIndex(idx) for idx in projected_columns_index]
 
         ret: list[Record] = []
-        for rid in range(1, self.table.last_rid):
-            rec = self.table.get_record_by_rid(rid)
-            col_list = list(rec.columns)
-            if rec.columns[search_key_index] == search_key:
-                for i, col in enumerate(col_list):
-                    if projected_columns_index[i] == 0:
-                        col_list[i] = None 
-                    else:
-                        schema_encoding = rec.schema_encoding
-                        if helper.ith_bit(schema_encoding, self.table.num_columns, i, False) == 0b1: # check if the column has been updated. 
-                            print("detected on schema encoding bit")
-                            assert rec.indirection_column is not None, "inconsistent state: schema_encoding bit on but indirection was None"
-                            curr = rec.indirection_column 
-                            while self.table.get_record_by_rid(curr).columns[i] is None:
-                                temp = self.table.get_record_by_rid(curr).indirection_column
-                                assert temp is not None
-                                curr = temp
-                                
+        if search_key_index != self.table.key_index:
+            for rid in range(1, self.table.last_rid):
+                rec = self.table.get_record_by_rid(rid)
+                col_list = list(rec.columns)
+                if rec.columns[search_key_index] == search_key:
+                    for i, col in enumerate(col_list):
+                        if projected_columns_index[i] == 0:
+                            col_list[i] = None
+                        else:
+                            schema_encoding = rec.schema_encoding
+                            if helper.ith_bit(schema_encoding, self.table.num_columns, i,
+                                              False) == 0b1:  # check if the column has been updated.
+                                print("detected on schema encoding bit")
+                                assert rec.indirection_column is not None, "inconsistent state: schema_encoding bit on but indirection was None"
+                                curr = rec.indirection_column
+                                while self.table.get_record_by_rid(curr).columns[i] is None:
+                                    temp = self.table.get_record_by_rid(curr).indirection_column
+                                    assert temp is not None
+                                    curr = temp
 
-                            col_list[i] = self.table.get_record_by_rid(rec.indirection_column)[i]
-                        # rec.columns[i] = None  # filter out that column from the projection
-                rec.columns = tuple(col_list)
-                if rec.rid != None:
-                    ret.append(rec)
+                                col_list[i] = self.table.get_record_by_rid(rec.indirection_column)[i]
+                            # rec.columns[i] = None  # filter out that column from the projection
+                    rec.columns = tuple(col_list)
+                    if rec.rid != None:
+                        ret.append(rec)
+        else:
+            rid = self.table.index.locate(search_key_index,
+                                          search_key)  # Index.locate() function returns the rid for matching cases
+            if rid != False:
+                rec = self.table.get_record_by_rid(rid)
+                for column_value, data_index_indicator in zip(rec, projected_columns_index):
+                    if data_index_indicator == 1:
+                        ret.append(column_value)
+            else:
+                return None
         # self.table.page_ranges.
-        return ret 
+        return ret
 
     """
     # Read matching record with specified search key
@@ -224,7 +244,7 @@ class Query:
         base_page_dir_entry = self.table.page_directory[base_record.rid]
         page_range = base_page_dir_entry.page_range
         # self.insert_tail(tail_page, )
-        
+
         tail_1_values: list[int | None] = []
         tail_1_indirection: int = 0
         tail_1_schema_encoding: int = 0b0
@@ -238,7 +258,7 @@ class Query:
                 tail_1_values = [None] * len(columns)
                 tail_1_indirection = base_record.rid
                 # the first bit is a flag, specifying whether this tail record is a snapshot of original base page values or an updated value
-                tail_1_schema_encoding = 0b1 << self.table.num_columns # ..for now. we also need to take into account which columns were updated
+                tail_1_schema_encoding = 0b1 << self.table.num_columns  # ..for now. we also need to take into account which columns were updated
             else:
                 tail_indirection = base_record.indirection_column
                 # new_record_values.append([])
@@ -260,7 +280,8 @@ class Query:
                     tail_schema_encoding |= schema_shift
 
             if first_update:
-                tail_indirection = self.insert_tail(page_range, tail_1_indirection, tail_1_schema_encoding, *tail_1_values)
+                tail_indirection = self.insert_tail(page_range, tail_1_indirection, tail_1_schema_encoding,
+                                                    *tail_1_values)
             else:
                 if not isinstance(base_record.indirection_column, int): return False
                 tail_indirection = base_record.indirection_column
@@ -273,7 +294,7 @@ class Query:
 
                 # prev_schema_encoding = last_update_page_dir_entry["page"].get_nth_record(
                 #     last_update_page_dir_entry["offset"]).schema_encoding
-                tail_schema_encoding |= prev_schema_encoding # if first_update, these two should be the same. but if not then it might change
+                tail_schema_encoding |= prev_schema_encoding  # if first_update, these two should be the same. but if not then it might change
 
 
         else:
@@ -297,7 +318,8 @@ class Query:
 
                     # packed_data = struct.pack(config.PACKING_FORMAT_STR, bitmask)
                     # Append the packed bytes to the bytearray
-                    page.update_nth_record(offset, config.NULL_COLUMN, bitmask) # the other bits in the null column no longer matter because they are deleted
+                    page.update_nth_record(offset, config.NULL_COLUMN,
+                                           bitmask)  # the other bits in the null column no longer matter because they are deleted
                     if isinstance(base_dir_entry, BasePage):
                         break
                     # page.physical_pages[config.NULL_COLUMN].data[offset*8:offset*8+8] = packed_data
@@ -308,9 +330,11 @@ class Query:
                 base_dir_entry.page.update_nth_record(base_dir_entry.offset, config.NULL_COLUMN, bitmask)
 
         base_indirection = self.insert_tail(page_range, tail_indirection, tail_schema_encoding, *updated_columns)
-        success = base_page_dir_entry.page.update_nth_record(base_page_dir_entry.offset, config.INDIRECTION_COLUMN, base_indirection)
+        success = base_page_dir_entry.page.update_nth_record(base_page_dir_entry.offset, config.INDIRECTION_COLUMN,
+                                                             base_indirection)
         assert success, "update not successful"
-        success = base_page_dir_entry.page.update_nth_record(base_page_dir_entry.offset, config.SCHEMA_ENCODING_COLUMN, tail_schema_encoding)
+        success = base_page_dir_entry.page.update_nth_record(base_page_dir_entry.offset, config.SCHEMA_ENCODING_COLUMN,
+                                                             tail_schema_encoding)
         assert success, "update not successful"
         return success
         # tail_1_indirection = rid if first_update else last_update_rid
@@ -375,7 +399,8 @@ class Query:
     # Returns False if no record exists in the given range
     """
 
-    def sum_version(self, start_range: int, end_range: int, aggregate_column_index: DataIndex, relative_version: int) -> int | bool:
+    def sum_version(self, start_range: int, end_range: int, aggregate_column_index: DataIndex,
+                    relative_version: int) -> int | bool:
         # TODO: implement
         return False
 
@@ -394,7 +419,7 @@ class Query:
             updated_columns: list[int | None] = [None] * self.table.num_columns
             to_add: int = 0
             rec_col = r[column]
-            if rec_col is not None: 
+            if rec_col is not None:
                 to_add = rec_col
             updated_columns[column] = to_add + 1
             u = self.update(key, *updated_columns)

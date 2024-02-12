@@ -6,7 +6,7 @@ from random import choice, randint, sample, seed
 
 
 def debugger_2(db: Database) -> None:
-    print("DATABASE: ")
+    #print("DATABASE: ")
     for table in db.tables:
         print(table)
 
@@ -58,7 +58,7 @@ query = Query(grades_table)
 records = {}
 keys = []
 
-number_of_records = 1
+number_of_records = 10
 seed(3562901)
 
 for i in range(0, number_of_records):
@@ -71,30 +71,46 @@ for i in range(0, number_of_records):
     records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
     keys.append(key)
     query.insert(*records[key])
-    print(key, records)
+    #print(key, records)
 print("insert finished")
-print(db.tables[0].get_record_by_rid(1))
+#print(db.tables[0].get_record_by_rid(1))
 # debugger_2(db)
 
 
-updated_records = {}
-for key in records:
-    updated_columns: list[int | None] = [None, None, None, None, None]
-    updated_records[key] = records[key].copy()
-    for i in range(2, grades_table.num_columns):
-        # updated value
-        value = randint(0, 20)
-        updated_columns[i] = value
-        # update our test directory
-        updated_records[key][i] = value
-    print(f"columns should be updated to {updated_columns}")
-    query.update(key, *updated_columns)
-print("update finished. records:")
-print(updated_records)
-# debugger_2(db)
-print(db.tables[0].get_record_by_rid(1))
-print(db.tables[0].get_record_by_rid(2))
-print(db.tables[0].get_record_by_rid(3))
+# updated_records = {}
+# for key in records:
+#     updated_columns: list[int | None] = [None, None, None, None, None]
+#     updated_records[key] = records[key].copy()
+#     for i in range(2, grades_table.num_columns):
+#         # updated value
+#         value = randint(0, 20)
+#         updated_columns[i] = value
+#         # update our test directory
+#         updated_records[key][i] = value
+#     print(f"columns should be updated to {updated_columns}")
+#     query.update(key, *updated_columns)
+# print("update finished. records:")
+# print(updated_records)
+# # debugger_2(db)
+# print(db.tables[0].get_record_by_rid(1))
+# print(db.tables[0].get_record_by_rid(2))
+# print(db.tables[0].get_record_by_rid(3))
 
-print(helper.str_each_el(query.select(keys[0], DataIndex(0), [1] * 5)))
+#print(helper.str_each_el( query.select(keys[0], DataIndex(0), [1] * 5) ))
 # print(f"delete successful, key: {keys[0]}" if query.delete(keys[0]) else "delete failed")
+print("\n+++++++++ INDEX DEMO +++++++++")
+
+print("\n==== Index Tree ====")
+print(db.tables[0].index.indices[db.tables[0].key_index].print_tree(db.tables[0].index.indices[db.tables[0].key_index].root))
+
+ret = query.select(92106430, db.tables[0].key_index, [1, 1, 1, 1, 1])
+print("\n==== query.select using index ====\nvalue to look up: 92106430")
+print("The entire record found: ", ret)
+
+print("\nThen narrow the result to three columns: ")
+ret = query.select(92106430, db.tables[0].key_index, [1, 1, 0, 0, 1])
+print('result2: ', ret)
+
+print("\n==== query.select using index (if no matching cases) ====\nvalue to look up: 666666")
+ret = query.select(666666, db.tables[0].key_index, [1, 1, 1, 1, 1])
+print('result3: ', ret)

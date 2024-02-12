@@ -180,8 +180,9 @@ class Index:
 
     def create_index(self, column_number):
 
-        if self.indices[column_number] is not None:
+        if self.indices[column_number] is None:
             self.indices[column_number] = self.BTree(t=3)
+
 
     def update_index(self, column_number, key, value):
         """
@@ -191,10 +192,11 @@ class Index:
         :return: None
         """
         if self.indices[column_number] is not None:
-            key_val_pair = (value, key)
+            #print("ABOUT TO UPDATE")
+            key_val_pair = (key, value)
             self.indices[column_number].insert(key_val_pair)  # insert the pair into existing tree index
+            #print("key_val_pair: ", key_val_pair)
 
-        pass
 
     """
     # optional: Drop index of specific column
