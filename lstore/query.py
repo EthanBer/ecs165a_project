@@ -171,41 +171,50 @@ class Query:
         # projected_columns_index = [DataIndex(idx) for idx in projected_columns_index]
 
         ret: list[Record] = []
-        if search_key_index != self.table.key_index:
+        # if search_key is the key_index, then the rid is located by the index
+        # otherwise, locate the rid manually
+        # ...get the updated value for this rid
+        valid_records: list[Record] = []
+        if search_key_index == self.table.key_index:
+            rid = self.table.index.locate(search_key_index, search_key)
+            valid_records.append(self.table.get_record_by_rid(rid))
+        else:
             for rid in range(1, self.table.last_rid):
                 rec = self.table.get_record_by_rid(rid)
-                col_list = list(rec.columns)
                 if rec.columns[search_key_index] == search_key:
-                    for i, col in enumerate(col_list):
-                        if projected_columns_index[i] == 0:
-                            col_list[i] = None
-                        else:
-                            schema_encoding = rec.schema_encoding
-                            if helper.ith_bit(schema_encoding, self.table.num_columns, i,
-                                              False) == 0b1:  # check if the column has been updated.
-                                print("detected on schema encoding bit")
-                                assert rec.indirection_column is not None, "inconsistent state: schema_encoding bit on but indirection was None"
-                                curr = rec.indirection_column
-                                while self.table.get_record_by_rid(curr).columns[i] is None:
-                                    temp = self.table.get_record_by_rid(curr).indirection_column
-                                    assert temp is not None
-                                    curr = temp
+                    valid_records.append(rec)
+                #     valid_records.append(rid)
+        
+        for record in valid_records:
+            col_list = list(record.columns)
+            for i in range(len(col_list)):
+                if projected_columns_index[i] == 0:
+                    col_list[i] = None
+                else:
+                    if record.rid == None:
+                        continue
+                    else:
+                        schema_encoding = record.schema_encoding
+                        if helper.ith_bit(schema_encoding, self.table.num_columns, i,
+                                            False) == 0b1:  # check if the column has been updated.
+                            print("detected on schema encoding bit")
+                            assert record.indirection_column is not None, "inconsistent state: schema_encoding bit on but indirection was None"
+                            curr = record.indirection_column
+                            while self.table.get_record_by_rid(curr).columns[i] is None:
+                                temp = self.table.get_record_by_rid(curr).indirection_column
+                                assert temp is not None
+                                curr = temp
+                            col_list[i] = self.table.get_record_by_rid(record.indirection_column)[i]
+                    # rec.columns[i] = None  # filter out that column from the projection
+            record.columns = tuple(col_list)
+            ret.append(record)
 
-                                col_list[i] = self.table.get_record_by_rid(rec.indirection_column)[i]
-                            # rec.columns[i] = None  # filter out that column from the projection
-                    rec.columns = tuple(col_list)
-                    if rec.rid != None:
-                        ret.append(rec)
-        else:
-            rid = self.table.index.locate(search_key_index,
-                                          search_key)  # Index.locate() function returns the rid for matching cases
-            if rid != False:
-                rec = self.table.get_record_by_rid(rid)
-                for column_value, data_index_indicator in zip(rec, projected_columns_index):
-                    if data_index_indicator == 1:
-                        ret.append(column_value)
-            else:
-                return None
+            # for i, column_value, data_index_indicator in enumerate(zip(rec.columns, projected_columns_index)):
+            #     if data_index_indicator == 1:
+            #         rec.columns[i] = column_value
+            # return [rec]
+            # else:
+            #     return None
         # self.table.page_ranges.
         return ret
 
@@ -236,6 +245,9 @@ class Query:
         if len(columns) != self.table.num_columns:
             return False
         primary_key_matches = self.select(primary_key, self.table.key_index, [1] * len(columns))
+        print(primary_key_matches)
+        assert len(primary_key_matches) == 1, f"only one primary key match for select, len was {len(primary_key_matches)}"
+            
         if len(primary_key_matches) != 1:
             return False
         # assert len(primary_key_matches) == 1 # primary key results in ONE select result

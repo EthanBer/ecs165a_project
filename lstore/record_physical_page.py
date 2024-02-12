@@ -10,6 +10,7 @@ class Record:
         self.rid = metadata.rid
         self.schema_encoding = metadata.schema_encoding
         self.key = key
+        self.metadata = metadata
         self.columns = columns
 
     def __getitem__(self, key: int) -> int | None:

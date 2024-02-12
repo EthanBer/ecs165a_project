@@ -88,7 +88,9 @@ for key in records:
         # update our test directory
         updated_records[key][i] = value
     print(f"columns should be updated to {updated_columns}")
-    query.update(key, *updated_columns)
+    b = query.update(key, *updated_columns)
+    if not b:
+        print("something failed")
 print("update finished. records:")
 print(updated_records)
 # debugger_2(db)
