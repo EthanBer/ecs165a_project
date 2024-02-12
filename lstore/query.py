@@ -264,9 +264,20 @@ class Query:
         tail_1_values: list[int | None] = []
         tail_1_indirection: int = 0
         tail_1_schema_encoding: int = 0b0
+        tail_schema_encoding = 0b0  # ..for now. we need to take into account updated columns
         tail_indirection: int
         first_update = False
 
+        updated_columns: list[int | None] = [None] * self.table.num_columns
+        for i, column in enumerate(columns):
+            if column is not None:
+                updated_columns[i] = column
+                schema_shift = helper.ith_total_col_shift(self.table.num_columns, i, False)
+                # schema_shift = 1 << (self.table.num_columns - i - 1)
+                if first_update:
+                    tail_1_values[i] = base_record.columns[i]
+                    # tail_1_schema_encoding |= schema_shift
+                tail_schema_encoding |= schema_shift
         if not delete:
             if base_record.indirection_column is None:  # this record hasn't been updated before
                 first_update = True
@@ -279,21 +290,10 @@ class Query:
                 tail_indirection = base_record.indirection_column
                 # new_record_values.append([])
                 # ... put tail record
-            tail_schema_encoding = 0  # ..for now. we need to take into account updated columns
             # if not tail_page.has_capacity(2 if first_update else 1):
             #     tail_page = TailPage(page_range, page_range.num_columns)
             #     page_range.append_tail_page(tail_page)
 
-            updated_columns: list[int | None] = [None] * self.table.num_columns
-            for i, column in enumerate(columns):
-                if column is not None:
-                    updated_columns[i] = column
-                    schema_shift = helper.ith_total_col_shift(self.table.num_columns, i, False)
-                    # schema_shift = 1 << (self.table.num_columns - i - 1)
-                    if first_update:
-                        tail_1_values[i] = base_record.columns[i]
-                        # tail_1_schema_encoding |= schema_shift
-                    tail_schema_encoding |= schema_shift
 
             if first_update:
                 tail_indirection = self.insert_tail(page_range, tail_1_indirection, tail_1_schema_encoding,
