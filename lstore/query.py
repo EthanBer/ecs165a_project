@@ -60,7 +60,7 @@ class Query:
             page.physical_pages[config.NULL_COLUMN].data[offset*8:offset*8+8] = packed_data
             indirection_column = struct.unpack('>Q', page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]
         """
-        return self.update(primary_key, True, *([None] * self.table.num_columns))
+        return self.update(primary_key, *([None] * self.table.num_columns), delete=True)
         # bitmask = 1 << (self.table.num_columns - config.RID_COLUMN - 1)
         # page_dir_entry = self.table.page_directory[record.rid]
         # page = page_dir_entry.page
@@ -239,9 +239,13 @@ class Query:
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
 
-    def update(self, primary_key: int, delete: bool = False, *columns: int | None) -> bool:
+    def update(self, primary_key: int, *columns: int | None, **kwargs: bool) -> bool:
+        delete = kwargs.get("delete")
+        if delete is None:
+            delete = False
+
         assert len(
-            columns) == self.table.num_columns, f"len(columns) must be equal to number of columns in table; argument had length {len(columns)} but expected {self.table.num_columns} length"
+            columns) == self.table.num_columns, f"len(columns) must be equal to number of columns in table; argument had length {len(columns)} but expected {self.table.num_columns} length, cols was {columns}"
         if len(columns) != self.table.num_columns:
             return False
         primary_key_matches = self.select(primary_key, self.table.key_index, [1] * len(columns))

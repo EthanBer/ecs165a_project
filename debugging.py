@@ -98,4 +98,5 @@ print(db.tables[0].get_record_by_rid(2))
 print(db.tables[0].get_record_by_rid(3))
 
 print(helper.str_each_el(query.select(keys[0], DataIndex(0), [1] * 5)))
+# print(helper.str_each_el(query.select(keys[0], DataIndex(0), [0, 1, 0, 0, 0])))
     # print(f"delete successful, key: {keys[0]}" if query.delete(keys[0]) else "delete failed")

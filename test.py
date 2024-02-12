@@ -3,7 +3,6 @@ from lstore.query import Query
 from random import choice, randint, sample, seed
 
 
-from debugging import debugger_2
 from lstore.ColumnIndex import DataIndex, RawIndex
 
 
@@ -17,6 +16,10 @@ from lstore.ColumnIndex import DataIndex, RawIndex
 
 
 
+def debugger_2(db: Database) -> None:
+    print("DATABASE: ")
+    for table in db.tables:
+        print(table)
 db = Database()
 grades_table = db.create_table('Grades', 5, DataIndex(0))
 # create a query class for the grades table
