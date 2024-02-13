@@ -408,7 +408,6 @@ class Query:
                 s += self.table.get_record_by_rid(record.indirection_column)[aggregate_column_index]
         return s
 
-
     """
     :param start_range: int         # Start of the key range to aggregate 
     :param end_range: int           # End of the key range to aggregate 

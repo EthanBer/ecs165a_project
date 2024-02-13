@@ -74,26 +74,27 @@ if __name__ == "__main__":
     # debugger_2(db)
 
 
-    updated_records = {}
-    for key in records:
-        updated_columns: list[int | None] = [None, None, None, None, None]
-        updated_records[key] = records[key].copy()
-        for i in range(2, grades_table.num_columns):
-            # updated value
-            value = randint(0, 20)
-            updated_columns[i] = value
-            # update our test directory
-            updated_records[key][i] = value
-        print(f"columns should be updated to {updated_columns}")
-        query.update(key, *updated_columns)
-    print("update finished. records:")
-    print(updated_records)
-    # debugger_2(db)
-    print(db.tables[0].get_record_by_rid(1))
-    print(db.tables[0].get_record_by_rid(2))
-    print(db.tables[0].get_record_by_rid(3))
-    print(db.tables[0])
-#query.delete(keys[0])   # Delete last record inserted
+updated_records = {}
+for key in records:
+    updated_columns: list[int | None] = [None, None, None, None, None]
+    updated_records[key] = records[key].copy()
+    for i in range(2, grades_table.num_columns):
+        # updated value
+        value = randint(0, 20)
+        updated_columns[i] = value
+        # update our test directory
+        updated_records[key][i] = value
+    print(f"columns should be updated to {updated_columns}")
+    query.update(key, *updated_columns)
+print("update finished. records:")
+print(updated_records)
+# debugger_2(db)
+print(db.tables[0].get_record_by_rid(1))
+print(db.tables[0].get_record_by_rid(2))
+print(db.tables[0].get_record_by_rid(3))
+
+print(helper.str_each_el(query.select(keys[0], DataIndex(0), [1] * 5)))
+query.delete(keys[0])   # Delete last record inserted
 # print(helper.str_each_el(query.select(keys[0], DataIndex(0), [1] * 5)))
 # print(helper.str_each_el(query.select(keys[0], DataIndex(0), [0, 1, 0, 0, 0])))
     # print(f"delete successful, key: {keys[0]}" if query.delete(keys[0]) else "delete failed")
