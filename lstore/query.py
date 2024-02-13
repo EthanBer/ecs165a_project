@@ -171,7 +171,7 @@ class Query:
     """
 
     def select(self, search_key: int, search_key_index: DataIndex,
-               projected_columns_index: list[Literal[0] | Literal[1]], use_idx: bool = False) -> list[Record]:
+               projected_columns_index: list[Literal[0] | Literal[1]], use_idx: bool = False) -> list[Record] | Literal[False]:
         # search_key_index = DataIndex(search_key_index)
         # projected_columns_index = [DataIndex(idx) for idx in projected_columns_index]
 
@@ -351,7 +351,7 @@ class Query:
             return False
         primary_key_matches = self.select(primary_key, self.table.key_index, [1] * len(columns))
         # print(primary_key_matches)
-        assert len(primary_key_matches) == 1, f"only one primary key match for select, len was {len(primary_key_matches)}"
+        assert primary_key_matches != False and len(primary_key_matches) == 1, f"only one primary key match for select"
             
         if len(primary_key_matches) != 1:
             return False
@@ -517,8 +517,8 @@ class Query:
             if aggregate_column_index == 1:
                 use_idx = False
             select_query = self.select(key, self.table.key_index, projected_cols)
-            if len(select_query) == 0: continue
-            assert len(select_query) == 1, "expected one for primary key"
+            if select_query == False or len(select_query) == 0: continue
+            assert len(select_query) == 1, "expected one for primary key but got " + str(len(select_query))
             num = select_query[0][aggregate_column_index]
             assert num is not None
             valid_numbers.append(num)
@@ -576,8 +576,9 @@ class Query:
     """
 
     def increment(self, key: int, column: DataIndex) -> bool:
-        r = self.select(key, self.table.key_index, [1] * self.table.num_columns)[0]
-        if r is not False:
+        select_query = self.select(key, self.table.key_index, [1] * self.table.num_columns)
+        if select_query is not False:
+            r = select_query[0]
             updated_columns: list[int | None] = [None] * self.table.num_columns
             to_add: int = 0
             rec_col = r[column]
