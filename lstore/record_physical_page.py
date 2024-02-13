@@ -4,7 +4,7 @@ from lstore.helper import helper
 
 
 class Record:
-    def __init__(self, metadata: Metadata, key: int | None, *columns : int | None):
+    def __init__(self, metadata: Metadata, key: int | None, base_record: bool, *columns : int | None):
         self.indirection_column = metadata.indirection_column
         self.timestamp = metadata.timestamp
         self.rid = metadata.rid
@@ -12,7 +12,7 @@ class Record:
         self.key = key
         self.metadata = metadata
         self.columns = columns
-        # self.base_record = base_record
+        self.base_record = base_record
 
     def __getitem__(self, key: int) -> int | None:
         # this syntax is used in the increment() function of query.py, so this operator should be implemented
@@ -24,6 +24,11 @@ class Record:
         # if the physical value is 0, the actual value could be 0 or None depending on the corresponding NULL_COLUMN value
         return f"Record RID{self.rid}; idr:{self.indirection_column}; senc:{bin(self.schema_encoding)}; key:{self.key}; columns:{self.columns}"
 
+# class BaseRecord(Record):
+#     pass
+
+# class TailRecord(Record):
+#     pass
 
 class PhysicalPage:
 

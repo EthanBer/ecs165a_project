@@ -82,12 +82,12 @@ for c in range(0, grades_table.num_columns):
     for i in range(0, number_of_aggregates):
         r = sorted(sample(range(0, len(keys)), 2))
         # calculate the sum form test directory
-        print(f"summing key ranges {keys[r[0]]} to {keys[r[1]]}")
+        # print(f"summing key ranges {keys[r[0]]} to {keys[r[1]]}")
         column_sum = sum(map(lambda key: records[key][c], keys[r[0]: r[1] + 1]))
         result = query.sum(keys[r[0]], keys[r[1]], c)
         if column_sum != result:
             print('sum error on [', keys[r[0]], ',', keys[r[1]], ']: ', result, ', correct: ', column_sum, f"c = {c}")
         else:
             pass
-            print('sum on [', keys[r[0]], ',', keys[r[1]], ']: ', column_sum)
+            # print('sum on [', keys[r[0]], ',', keys[r[1]], ']: ', column_sum)
 

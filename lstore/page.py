@@ -1,4 +1,3 @@
-
 import random
 import struct
 from lstore.record_physical_page import Record, PhysicalPage
@@ -130,7 +129,8 @@ class Page:
         for i in range(config.NUM_METADATA_COL, config.NUM_METADATA_COL + self.num_columns):
             columns.append(self.physical_pages[i].__get_nth_record__(record_idx))
         
-        return Record(Metadata(indirection_column, rid, timestamp, schema_encoding, null_col), key_col, *columns)
+        from lstore.base_tail_page import BasePage
+        return Record(Metadata(indirection_column, rid, timestamp, schema_encoding, null_col), key_col, isinstance(self, BasePage), *columns)
 
     def update_nth_record(self, record_idx: int, update_col_idx: RawIndex, new_val: int) -> bool:
         self.physical_pages[update_col_idx].data[(record_idx * 8):(record_idx * 8)+8] = struct.pack(config.PACKING_FORMAT_STR, new_val)

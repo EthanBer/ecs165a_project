@@ -67,7 +67,7 @@ if __name__ == "__main__":
 
         records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
         keys.append(key)
-        print(f"inserting {records[key]}")
+        # print(f"inserting {records[key]}")
         query.insert(*records[key])
         # print(key, records)
     # print("insert finished")
