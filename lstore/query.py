@@ -344,7 +344,8 @@ class Query:
                     # Append the packed bytes to the bytearray
                     page.update_nth_record(offset, config.NULL_COLUMN,
                                            bitmask)  # the other bits in the null column no longer matter because they are deleted
-                    if isinstance(base_dir_entry, BasePage):
+                    page.update_nth_record(offset, config.RID_COLUMN, 0b0) # set the RID to null
+                    if isinstance(page, BasePage):
                         break
                     # page.physical_pages[config.NULL_COLUMN].data[offset*8:offset*8+8] = packed_data
                     tmp_indirection_col = helper.unpack_col(page, config.INDIRECTION_COLUMN, offset)

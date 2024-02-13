@@ -96,17 +96,19 @@ print("update finished. records:")
 print(updated_records)
 query.update(key, *[None, 78, None, None, None])
 query.update(key, *[None, None, 89, None, None])
-# debugger_2(db)
 print(db.tables[0].get_record_by_rid(1))
 print(db.tables[0].get_record_by_rid(2))
 print(db.tables[0].get_record_by_rid(3))
-print(db.tables[0].get_record_by_rid(4))
 print(db.tables[0].get_record_by_rid(5))
 
 
 print(helper.str_each_el(query.select(keys[0], DataIndex(0), [1] * 5)))
 
-# query.delete(keys[0])   # Delete last record inserted
+query.delete(keys[0])   # Delete last record inserted
+# print(helper.str_each_el(query.select(keys[0], DataIndex(0), [1] * 5)))
+# print(db.tables[0].get_record_by_rid(1))
+print(db.tables[0].get_record_by_rid(6))
+# debugger_2(db)
 # print(helper.str_each_el(query.select(keys[0], DataIndex(0), [1] * 5)))
 # print(helper.str_each_el(query.select(keys[0], DataIndex(0), [0, 1, 0, 0, 0])))
     # print(f"delete successful, key: {keys[0]}" if query.delete(keys[0]) else "delete failed")
