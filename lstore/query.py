@@ -130,16 +130,17 @@ class Query:
                 page = BasePage(self.table.num_columns, self.table.key_index)
                 page_range = self.table.page_ranges[-1]
                 self.table.page_ranges[-1].base_pages.append(page)
-        else:  # the last page of the range can fit another record. don't do any new allocation.
-            page = self.table.page_ranges[-1].base_pages[-1]
-            page_range = self.table.page_ranges[-1]
+        page = self.table.page_ranges[-1].base_pages[-1]
+        page_range = self.table.page_ranges[-1]
 
         if page is None or page_range is None:
             return False
 
         # the null column in this Metadata object won't be used by the page insert.
+        print(f"trying to insert")
         rid = self.table.page_ranges[-1].base_pages[-1].insert(
             Metadata(None, self.table.last_rid, timestamp, schema_encoding, None), *columns)
+        print(f"rid: {rid}")
 
         # if rid == -1:
         #     self.table.page_ranges.append(PageRange(self.table.num_columns, self.table.key_index))
@@ -178,7 +179,7 @@ class Query:
         # otherwise, locate the rid manually
         # ...get the updated value for this rid
         valid_records: list[Record] = []
-        if search_key_index == self.table.key_index:
+        if False: # search_key_index == self.table.key_index
             rid = self.table.index.locate(search_key_index, search_key)
             valid_records.append(self.table.get_record_by_rid(rid))
         else:

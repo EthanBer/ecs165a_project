@@ -109,7 +109,7 @@ class Page:
                 # is_none = ( thing >> ( self.num_columns + config.NUM_METADATA_COL - col_idx - 1 ) ) & 1
                 is_none = helper.ith_bit(thing, self.num_columns + config.NUM_METADATA_COL, col_idx)
                 if is_none == 1:
-                    print("set some value to None")
+                    # print("set some value to None")
                     val = None
             return val
 

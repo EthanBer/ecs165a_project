@@ -1,9 +1,9 @@
 x page range capacity not implemented
 ? raise exception is used instead of return False
 x updated values are not gotten by get_nth_record
-- delete not tested yet
+x delete not tested yet
 - select_version not implemented yet
 - Index not tested yet
-- sum is definitely not correct
+x sum is definitely not correct
 ? reading a record could result in reading a record that has a None RID (because it was deleted). fix select, other methods that get impacted with this problem
 x the base record's schema encoding doesn't change for update
