@@ -187,6 +187,7 @@ class Query:
         
         for record in valid_records:
             col_list = list(record.columns)
+            schema_encoding = record.schema_encoding
             for i in range(len(col_list)):
                 if projected_columns_index[i] == 0:
                     col_list[i] = None
@@ -194,17 +195,21 @@ class Query:
                     if record.rid == None:
                         continue
                     else:
-                        schema_encoding = record.schema_encoding
                         if helper.ith_bit(schema_encoding, self.table.num_columns, i,
                                             False) == 0b1:  # check if the column has been updated.
                             print("detected on schema encoding bit")
                             assert record.indirection_column is not None, "inconsistent state: schema_encoding bit on but indirection was None"
-                            curr = record.indirection_column
-                            while self.table.get_record_by_rid(curr).columns[i] is None:
-                                temp = self.table.get_record_by_rid(curr).indirection_column
-                                assert temp is not None
-                                curr = temp
-                            col_list[i] = self.table.get_record_by_rid(record.indirection_column)[i]
+                            curr_rid = record.indirection_column
+                            curr_schema_encoding = self.table.get_record_by_rid(curr_rid).schema_encoding
+                            while helper.ith_bit(curr_schema_encoding, self.table.num_columns, i, False) == 0b0:
+                                print(f"schema encoding {curr_schema_encoding} indicates this record doesn't have the data. ")
+                                temp = self.table.get_record_by_rid(curr_rid)
+                                assert temp.indirection_column is not None
+                                curr_rid = temp.indirection_column
+                                curr_schema_encoding = self.table.get_record_by_rid(curr_rid).schema_encoding
+                                # curr_rid, curr_schema_encoding = temp.indirection_column, temp.schema_encoding
+                                # curr_indirection = temp
+                            col_list[i] = self.table.get_record_by_rid(curr_rid)[i]
                     # rec.columns[i] = None  # filter out that column from the projection
             record.columns = tuple(col_list)
             ret.append(record)
@@ -261,33 +266,29 @@ class Query:
         page_range = base_page_dir_entry.page_range
         # self.insert_tail(tail_page, )
 
-        tail_1_values: list[int | None] = []
-        tail_1_indirection: int = 0
-        tail_1_schema_encoding: int = 0b0
+        tail_1_values: list[int | None] = [None] * len(columns)
+        tail_1_indirection: int = base_record.rid if base_record.indirection_column is None else base_record.indirection_column
+        tail_1_schema_encoding = 0b1 << self.table.num_columns  # ..for now. we also need to take into account which columns were updated
         tail_schema_encoding = 0b0  # ..for now. we need to take into account updated columns
-        tail_indirection: int
-        first_update = False
+        tail_indirection: int = 0
+        column_first_update: bool = False
 
         updated_columns: list[int | None] = [None] * self.table.num_columns
-        for i, column in enumerate(columns):
+        print(f"columns passed were {columns}")
+        for i, column in enumerate(columns): # you can't change a value to None, unfortuntately. 
             if column is not None:
                 updated_columns[i] = column
                 schema_shift = helper.ith_total_col_shift(self.table.num_columns, i, False)
                 # schema_shift = 1 << (self.table.num_columns - i - 1)
-                if first_update:
+                if helper.ith_bit(base_record.schema_encoding, self.table.num_columns, i, False) == 0b0:
                     tail_1_values[i] = base_record.columns[i]
+                    if not column_first_update:
+                        column_first_update = True
                     # tail_1_schema_encoding |= schema_shift
                 tail_schema_encoding |= schema_shift
         if not delete:
-            if base_record.indirection_column is None:  # this record hasn't been updated before
-                first_update = True
-                # will set the key to none, wherever it is
-                tail_1_values = [None] * len(columns)
-                tail_1_indirection = base_record.rid
-                # the first bit is a flag, specifying whether this tail record is a snapshot of original base page values or an updated value
-                tail_1_schema_encoding = 0b1 << self.table.num_columns  # ..for now. we also need to take into account which columns were updated
-            else:
-                tail_indirection = base_record.indirection_column
+            # if base_record.indirection_column is not None:
+            #     tail_indirection = base_record.indirection_column
                 # new_record_values.append([])
                 # ... put tail record
             # if not tail_page.has_capacity(2 if first_update else 1):
@@ -295,22 +296,26 @@ class Query:
             #     page_range.append_tail_page(tail_page)
 
 
-            if first_update:
+            if column_first_update:
                 tail_indirection = self.insert_tail(page_range, tail_1_indirection, tail_1_schema_encoding,
                                                     *tail_1_values)
             else:
-                if not isinstance(base_record.indirection_column, int): return False
+                # if not column_first_update, at least one bit in the schema encoding had to be a 1
+                # in that case, we know the record should an indirection column, since it was updated
+                assert isinstance(base_record.indirection_column, int), f"inconsistent state: expected base record's indirection column to be an integer but instead got {type(base_record.indirection_column)}"
                 tail_indirection = base_record.indirection_column
                 # if last_update_rid:
                 #     last_update_page_dir_entry = self.table.page_directory[last_update_rid]
                 # se:
                 #     assert False, "brh"
 
-                prev_schema_encoding = self.table.get_record_by_rid(tail_indirection).schema_encoding
+                # prev_schema_encoding = self.table.get_record_by_rid(tail_indirection).schema_encoding
+
 
                 # prev_schema_encoding = last_update_page_dir_entry["page"].get_nth_record(
                 #     last_update_page_dir_entry["offset"]).schema_encoding
-                tail_schema_encoding |= prev_schema_encoding  # if first_update, these two should be the same. but if not then it might change
+                # tail_schema_encoding |= prev_schema_encoding  # if first_update, these two should be the same. but if not then it might change
+                
 
 
         else:
@@ -349,9 +354,12 @@ class Query:
         success = base_page_dir_entry.page.update_nth_record(base_page_dir_entry.offset, config.INDIRECTION_COLUMN,
                                                              base_indirection)
         assert success, "update not successful"
+        base_schema_encoding = base_record.schema_encoding | tail_schema_encoding
         success = base_page_dir_entry.page.update_nth_record(base_page_dir_entry.offset, config.SCHEMA_ENCODING_COLUMN,
-                                                             tail_schema_encoding)
+                                                             base_schema_encoding)
         assert success, "update not successful"
+        # success = base_page_dir_entry.page.update_nth_record(base_page_dir_entry.offset, config.SCHEMA_ENCODING_COLUMN,
+        #                                                      tail_schema_encoding)
         return success
         # tail_1_indirection = rid if first_update else last_update_rid
 

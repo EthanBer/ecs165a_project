@@ -107,6 +107,7 @@ ret = query.select(92106430, db.tables[0].key_index, [1, 1, 1, 1, 1])
 print("\n==== query.select using index ====\nvalue to look up: 92106430")
 print("The entire record found: ", ret)
 
+
 print("\nThen narrow the result to three columns: ")
 ret = query.select(92106430, db.tables[0].key_index, [1, 1, 0, 0, 1])
 print('result2: ', ret)
