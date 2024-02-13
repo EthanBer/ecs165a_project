@@ -395,15 +395,19 @@ class Query:
     """
 
     def sum(self, start_range: int, end_range: int, aggregate_column_index: DataIndex) -> int | bool:
-        # TODO: fix
-        """
-        for rid in range(start_range, end_range + 1):
         s = 0
-            s = self.table.get_record_by_rid(rid).columns[aggregate_column_index]
-        if s:
-            return s
-        """
-        return False
+        for rid in range(start_range, end_range):
+            record = self.table.get_record_by_rid(rid)
+            schema_encoding = record.schema_encoding
+            if helper.ith_bit(schema_encoding, self.table.num_columns, aggregate_column_index,
+                              False) == 0b1:
+                curr = record.indirection_column
+                while self.table.get_record_by_rid(curr).columns[aggregate_column_index] == 0:
+                    temp = self.table.get_record_by_rid(curr).indirection_column
+                    curr = temp
+                s += self.table.get_record_by_rid(record.indirection_column)[aggregate_column_index]
+        return s
+
 
     """
     :param start_range: int         # Start of the key range to aggregate 
