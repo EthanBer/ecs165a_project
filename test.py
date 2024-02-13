@@ -50,7 +50,3 @@ print(db.tables[0].get_record_by_rid(1))
 query.delete(key)   # Delete last record inserted
 
 debugger_2(db)
-
-
-
-
