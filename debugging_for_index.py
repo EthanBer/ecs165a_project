@@ -6,9 +6,9 @@ from random import choice, randint, sample, seed
 
 
 def debugger_2(db: Database) -> None:
-    #print("DATABASE: ")
+    ## print("DATABASE: ")
     for table in db.tables:
-        print(table)
+        # print(table)
 
 
 # def debugger(db : Database) -> None:
@@ -16,30 +16,30 @@ def debugger_2(db: Database) -> None:
 #     for i in range(len(db.tables)):
 #         table = db.tables[i]
 
-#         print("Table Name: ", table.name)
-#         print("Page Directory: ")
-#         print(table.page_directory)
+#         # print("Table Name: ", table.name)
+#         # print("Page Directory: ")
+#         # print(table.page_directory)
 
 #         for j in range(len(table.page_ranges)):
-#             print("Current page range", j)
+#             # print("Current page range", j)
 
 #             #Printing base pages of the current page_range
-#             print("Base Pages:")
+#             # print("Base Pages:")
 #             for k in range(len(table.page_ranges[j].base_pages)):
 #                 current_base_page = table.page_ranges[j].base_pages[k]
 
 #                 #Printing physical pages of the current base page
 #                 for l in range(len(current_base_page.physical_pages)):
-#                     print(current_base_page.physical_pages[l].data)
+#                     # print(current_base_page.physical_pages[l].data)
 
 
 #             #Printing tail pages of the current page_range
-#             print("Tail Pages:")
+#             # print("Tail Pages:")
 #             for k in range(len(table.page_ranges[j].tail_pages)):
 #                 current_tail_page = table.page_ranges[j].tail_pages[k]
 #                 #Printing physical pages of the current tail page
 #                 for l in range(len(current_tail_page.physical_pages)):
-#                     print(current_tail_page.physical_pages[l].data)
+#                     # print(current_tail_page.physical_pages[l].data)
 
 
 db = Database()
@@ -71,9 +71,9 @@ for i in range(0, number_of_records):
     records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
     keys.append(key)
     query.insert(*records[key])
-    #print(key, records)
-print("insert finished")
-#print(db.tables[0].get_record_by_rid(1))
+    ## print(key, records)
+# print("insert finished")
+## print(db.tables[0].get_record_by_rid(1))
 # debugger_2(db)
 
 
@@ -87,31 +87,31 @@ print("insert finished")
 #         updated_columns[i] = value
 #         # update our test directory
 #         updated_records[key][i] = value
-#     print(f"columns should be updated to {updated_columns}")
+#     # print(f"columns should be updated to {updated_columns}")
 #     query.update(key, *updated_columns)
-# print("update finished. records:")
-# print(updated_records)
+# # print("update finished. records:")
+# # print(updated_records)
 # # debugger_2(db)
-# print(db.tables[0].get_record_by_rid(1))
-# print(db.tables[0].get_record_by_rid(2))
-# print(db.tables[0].get_record_by_rid(3))
+# # print(db.tables[0].get_record_by_rid(1))
+# # print(db.tables[0].get_record_by_rid(2))
+# # print(db.tables[0].get_record_by_rid(3))
 
-#print(helper.str_each_el( query.select(keys[0], DataIndex(0), [1] * 5) ))
-# print(f"delete successful, key: {keys[0]}" if query.delete(keys[0]) else "delete failed")
-print("\n+++++++++ INDEX DEMO +++++++++")
+## print(helper.str_each_el( query.select(keys[0], DataIndex(0), [1] * 5) ))
+# # print(f"delete successful, key: {keys[0]}" if query.delete(keys[0]) else "delete failed")
+# print("\n+++++++++ INDEX DEMO +++++++++")
 
-print("\n==== Index Tree ====")
-print(db.tables[0].index.indices[db.tables[0].key_index].print_tree(db.tables[0].index.indices[db.tables[0].key_index].root))
+# print("\n==== Index Tree ====")
+# print(db.tables[0].index.indices[db.tables[0].key_index].print_tree(db.tables[0].index.indices[db.tables[0].key_index].root))
 
 ret = query.select(92106430, db.tables[0].key_index, [1, 1, 1, 1, 1])
-print("\n==== query.select using index ====\nvalue to look up: 92106430")
-print("The entire record found: ", ret)
+# print("\n==== query.select using index ====\nvalue to look up: 92106430")
+# print("The entire record found: ", ret)
 
 
-print("\nThen narrow the result to three columns: ")
+# print("\nThen narrow the result to three columns: ")
 ret = query.select(92106430, db.tables[0].key_index, [1, 1, 0, 0, 1])
-print('result2: ', ret)
+# print('result2: ', ret)
 
-print("\n==== query.select using index (if no matching cases) ====\nvalue to look up: 666666")
+# print("\n==== query.select using index (if no matching cases) ====\nvalue to look up: 666666")
 ret = query.select(666666, db.tables[0].key_index, [1, 1, 1, 1, 1])
-print('result3: ', ret)
+# print('result3: ', ret)

@@ -56,20 +56,20 @@ class Page:
         null_bitmask = 0
         total_cols = len(columns) + config.NUM_METADATA_COL
         if metadata.indirection_column == None: # set 1 for null indirection column
-            print("setting indirection null bit")
+            # print("setting indirection null bit")
             null_bitmask = helper.ith_total_col_shift(total_cols, config.INDIRECTION_COLUMN)
             # null_bitmask = 1 << (total_cols - 1)
         for idx, column in enumerate(columns):
-            print(f"checking cols for null... {column}")
+            # print(f"checking cols for null... {column}")
             if column is None:
-                print("found a null col")
+                # print("found a null col")
                 null_bitmask = null_bitmask | helper.ith_total_col_shift(len(columns), idx, False) 
                 # null_bitmask = null_bitmask | (1 << (len(columns)-idx-1))
             
-        print(f"inserting null bitmask {bin(null_bitmask)}")
+        # print(f"inserting null bitmask {bin(null_bitmask)}")
         
         # Transform columns to a list to append the schema encoding and the indirection column
-        print(columns)
+        # print(columns)
         list_columns = list(columns)
         list_columns.insert(config.INDIRECTION_COLUMN, metadata.indirection_column)
         list_columns.insert(config.RID_COLUMN, metadata.rid)
@@ -77,14 +77,16 @@ class Page:
         list_columns.insert(config.SCHEMA_ENCODING_COLUMN, metadata.schema_encoding)
         list_columns.insert(config.NULL_COLUMN, null_bitmask)
         columns = tuple(list_columns)
-        print("COLUMNS with metadata")
-        print(columns)
+        # print("COLUMNS with metadata")
+        # print(columns)
 
         if (self.has_capacity == False):
             return -1
 
         for i in range(len(columns)):
+            # print(f"inserting raw value {columns[i]}")
             self.physical_pages[i].insert(columns[i])
+        # print(f"end record")
 
         self.num_records += 1
         # config.last_rid += 1
@@ -99,7 +101,7 @@ class Page:
 
         def get_check_for_none(col_idx: RawIndex, record_idx: int) -> int | None:
             val = self.physical_pages[col_idx].__get_nth_record__(record_idx)
-            # print("getting checking null")
+            # # print("getting checking null")
             if val == 0:
                 # breaking an abstraction barrier for convenience right now. TODO: fix?
                 thing = helper.unpack_col(self, config.NULL_COLUMN, record_idx)
@@ -109,7 +111,7 @@ class Page:
                 # is_none = ( thing >> ( self.num_columns + config.NUM_METADATA_COL - col_idx - 1 ) ) & 1
                 is_none = helper.ith_bit(thing, self.num_columns + config.NUM_METADATA_COL, col_idx)
                 if is_none == 1:
-                    # print("set some value to None")
+                    # # print("set some value to None")
                     val = None
             return val
 

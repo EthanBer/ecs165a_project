@@ -31,23 +31,17 @@ for i in range(0, number_of_records):
 
     records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
     query.insert(*records[key])
-    print("record: ")
-    print(records[key])
+    # print("record: ")
+    # print(records[key])
     record = query.select(key, 0, [1, 1, 1, 1, 1])[0]
-    # print('inserted', records[key])
-print("Insert finished")
+    # # print('inserted', records[key])
+# print("Insert finished")
 
 # Check inserted records using select query
 for key in records:
     # select function will return array of records 
     # here we are sure that there is only one record in t hat array
-    # try:
-    #     record = query.select(key, 0, [1, 1, 1, 1, 1])[0]
-    # except Exception:
-    #     print(query.select(key, 0, [1, 1, 1, 1, 1]))
-    #     print(record)
-    #     print(key)
-    #     raise(Exception("fail"))
+    record = query.select(key, 0, [1, 1, 1, 1, 1])[0]
     error = False
     for i, column in enumerate(record.columns):
         if column != records[key][i]:
@@ -84,13 +78,16 @@ for key in records:
 keys = sorted(list(records.keys()))
 # aggregate on every column 
 for c in range(0, grades_table.num_columns):
+    print(f"c = {c}")
     for i in range(0, number_of_aggregates):
         r = sorted(sample(range(0, len(keys)), 2))
         # calculate the sum form test directory
+        print(f"summing key ranges {keys[r[0]]} to {keys[r[1]]}")
         column_sum = sum(map(lambda key: records[key][c], keys[r[0]: r[1] + 1]))
         result = query.sum(keys[r[0]], keys[r[1]], c)
         if column_sum != result:
-            print('sum error on [', keys[r[0]], ',', keys[r[1]], ']: ', result, ', correct: ', column_sum)
+            print('sum error on [', keys[r[0]], ',', keys[r[1]], ']: ', result, ', correct: ', column_sum, f"c = {c}")
         else:
             pass
-            # print('sum on [', keys[r[0]], ',', keys[r[1]], ']: ', column_sum)
+            print('sum on [', keys[r[0]], ',', keys[r[1]], ']: ', column_sum)
+

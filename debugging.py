@@ -12,30 +12,30 @@ from random import choice, randint, sample, seed
 #     for i in range(len(db.tables)):
 #         table = db.tables[i]
 
-#         print("Table Name: ", table.name)
-#         print("Page Directory: ")
-#         print(table.page_directory)
+#         # print("Table Name: ", table.name)
+#         # print("Page Directory: ")
+#         # print(table.page_directory)
 
 #         for j in range(len(table.page_ranges)):
-#             print("Current page range", j)
+#             # print("Current page range", j)
 
 #             #Printing base pages of the current page_range
-#             print("Base Pages:")
+#             # print("Base Pages:")
 #             for k in range(len(table.page_ranges[j].base_pages)):
 #                 current_base_page = table.page_ranges[j].base_pages[k]
 
 #                 #Printing physical pages of the current base page
 #                 for l in range(len(current_base_page.physical_pages)):
-#                     print(current_base_page.physical_pages[l].data)
+#                     # print(current_base_page.physical_pages[l].data)
 
 
 #             #Printing tail pages of the current page_range
-#             print("Tail Pages:")
+#             # print("Tail Pages:")
 #             for k in range(len(table.page_ranges[j].tail_pages)):
 #                 current_tail_page = table.page_ranges[j].tail_pages[k]
 #                 #Printing physical pages of the current tail page
 #                 for l in range(len(current_tail_page.physical_pages)):
-#                     print(current_tail_page.physical_pages[l].data)
+#                     # print(current_tail_page.physical_pages[l].data)
 
 if __name__ == "__main__":
 
@@ -67,10 +67,11 @@ if __name__ == "__main__":
 
         records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
         keys.append(key)
+        print(f"inserting {records[key]}")
         query.insert(*records[key])
-        print(key, records)
-    print("insert finished")
-    print(db.tables[0].get_record_by_rid(1))
+        # print(key, records)
+    # print("insert finished")
+    # print(db.tables[0].get_record_by_rid(1))
     # debugger_2(db)
 
 
@@ -90,25 +91,26 @@ for key in records:
     #     updated_columns[i] = value
     #     # update our test directory
     #     updated_records[key][i] = value
-    # print(f"columns should be updated to {updated_columns}")
+    # # print(f"columns should be updated to {updated_columns}")
     # query.update(key, *updated_columns)
-print("update finished. records:")
-print(updated_records)
+# print("update finished. records:")
+# print(updated_records)
 query.update(key, *[None, 78, None, None, None])
 query.update(key, *[None, None, 89, None, None])
 print(db.tables[0].get_record_by_rid(1))
 print(db.tables[0].get_record_by_rid(2))
 print(db.tables[0].get_record_by_rid(3))
+print(db.tables[0].get_record_by_rid(4))
 print(db.tables[0].get_record_by_rid(5))
 
 
 print(helper.str_each_el(query.select(keys[0], DataIndex(0), [1] * 5)))
 
 query.delete(keys[0])   # Delete last record inserted
-# print(helper.str_each_el(query.select(keys[0], DataIndex(0), [1] * 5)))
-# print(db.tables[0].get_record_by_rid(1))
-print(db.tables[0].get_record_by_rid(6))
+# # print(helper.str_each_el(query.select(keys[0], DataIndex(0), [1] * 5)))
+# # print(db.tables[0].get_record_by_rid(1))
+# print(db.tables[0].get_record_by_rid(6))
 # debugger_2(db)
-# print(helper.str_each_el(query.select(keys[0], DataIndex(0), [1] * 5)))
-# print(helper.str_each_el(query.select(keys[0], DataIndex(0), [0, 1, 0, 0, 0])))
-    # print(f"delete successful, key: {keys[0]}" if query.delete(keys[0]) else "delete failed")
+# # print(helper.str_each_el(query.select(keys[0], DataIndex(0), [1] * 5)))
+# # print(helper.str_each_el(query.select(keys[0], DataIndex(0), [0, 1, 0, 0, 0])))
+    # # print(f"delete successful, key: {keys[0]}" if query.delete(keys[0]) else "delete failed")

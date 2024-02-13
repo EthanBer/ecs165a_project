@@ -18,7 +18,7 @@ class helper:
 
 	@staticmethod
 	def unpack_data(data: bytearray, record_idx: int) -> int: # idx is the byte index of desired data
-		# print(f"data{data}", record_idx)
+		# # print(f"data{data}", record_idx)
 		return struct.unpack(config.PACKING_FORMAT_STR, data[record_idx*8:record_idx*8+8])[0]
 	
 	@staticmethod

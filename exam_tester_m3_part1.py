@@ -27,7 +27,7 @@ try:
     grades_table.index.create_index(3)
     grades_table.index.create_index(4)
 except Exception as e:
-    print('Index API not implemented properly, tests may fail.')
+    # print('Index API not implemented properly, tests may fail.')
 
 keys = []
 records = {}
@@ -72,11 +72,11 @@ for key in keys:
         if column != records[key][i]:
             error = True
     if error:
-        print('select error on', key, ':', record, ', correct:', records[key])
+        # print('select error on', key, ':', record, ', correct:', records[key])
     else:
         pass
-        # print('select on', key, ':', record)
-print("Select finished")
+        # # print('select on', key, ':', record)
+# print("Select finished")
 
 
 db.close()

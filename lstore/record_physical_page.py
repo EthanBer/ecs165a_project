@@ -12,10 +12,12 @@ class Record:
         self.key = key
         self.metadata = metadata
         self.columns = columns
+        # self.base_record = base_record
 
     def __getitem__(self, key: int) -> int | None:
         # this syntax is used in the increment() function of query.py, so this operator should be implemented
         return self.columns[key]
+         #return col_list[key]
 
     def __str__(self) -> str:
         # NOTE: the self.columns is just the physical values in the columns. 
@@ -58,8 +60,8 @@ class PhysicalPage:
 
 
         if (value != 0):
-            #print("Value: ", value, "Index: ", record_idx)
-            # print("num records: ", num_records) print("offset: ", self.offset)
+            ## print("Value: ", value, "Index: ", record_idx)
+            # # print("num records: ", num_records) # print("offset: ", self.offset)
             pass
 
         return value

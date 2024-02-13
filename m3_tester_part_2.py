@@ -31,7 +31,7 @@ for i in range(0, number_of_records):
     key = 92106429 + i
     keys.append(key)
     records[key] = [key, randint(i * 20, (i + 1) * 20), randint(i * 20, (i + 1) * 20), randint(i * 20, (i + 1) * 20), randint(i * 20, (i + 1) * 20)]
-    # print(records[key])
+    # # print(records[key])
 
 transaction_workers = []
 transactions = []
@@ -60,7 +60,7 @@ for j in range(number_of_operations_per_record):
             records[key][i] = value
             transactions[key % number_of_transactions].add_query(query.select, grades_table, key, 0, [1, 1, 1, 1, 1])
             transactions[key % number_of_transactions].add_query(query.update, grades_table, key, *updated_columns)
-print("Update finished")
+# print("Update finished")
 
 
 # add trasactions to transaction workers  
@@ -86,11 +86,11 @@ for key in keys:
         
         result = query.select(key, 0, [1, 1, 1, 1, 1])[0].columns
         if correct != result:
-            print('select error on primary key', key, ':', result, ', correct:', correct)
+            # print('select error on primary key', key, ':', result, ', correct:', correct)
             score -= 1
     except:
-        print('Record Not found', key)
+        # print('Record Not found', key)
         score -= 1
-print('Score', score, '/', len(keys))
+# print('Score', score, '/', len(keys))
 
 db.close()
