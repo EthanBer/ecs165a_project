@@ -39,7 +39,7 @@ class Table:
 
     def __init__(self, name: str, num_columns: int, key_index: DataIndex, pages_per_range: int):
         self.name: str = name
-        self.key_index = key_index
+        self.key_index = DataIndex(key_index)
         self.num_columns: int = num_columns # data columns only
         self.total_columns = self.num_columns + config.NUM_METADATA_COL # inclding metadata
         self.page_directory: dict[int, PageDirectoryEntry] = {}

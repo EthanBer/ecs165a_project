@@ -277,6 +277,8 @@ class Query:
         column_first_update: bool = False
 
         updated_columns: list[int | None] = [None] * self.table.num_columns
+        if updated_columns == list(columns): # all Nones were passed in, do nothing.
+            return True
         print(f"columns passed were {columns}")
         for i, column in enumerate(columns): # you can't change a value to None, unfortuntately. 
             if column is not None:
@@ -305,7 +307,7 @@ class Query:
             else:
                 # if not column_first_update, at least one bit in the schema encoding had to be a 1
                 # in that case, we know the record should an indirection column, since it was updated
-                assert isinstance(base_record.indirection_column, int), f"inconsistent state: expected base record's indirection column to be an integer but instead got {type(base_record.indirection_column)}"
+                assert isinstance(base_record.indirection_column, int), f"inconsistent state: expected base record's indirection column to be an integer but instead got {type(base_record.indirection_column)}. columns was {columns}"
                 tail_indirection = base_record.indirection_column
                 # if last_update_rid:
                 #     last_update_page_dir_entry = self.table.page_directory[last_update_rid]

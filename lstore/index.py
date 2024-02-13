@@ -40,7 +40,7 @@ class Index:
     # returns the location of all records with the given value on column "column"
     """
 
-    def locate(self, column, value):
+    def locate(self, column, value) -> int:
 
         search_result = self.indices[column].search_key(value)
         if search_result is not None:
