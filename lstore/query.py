@@ -238,9 +238,66 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
 
-    # def select_version(self, search_key, search_key_index, projected_columns_index, relative_version):
-    #     true_index = search_key_index + 4
-    #     pass
+    def select_version(self, search_key, search_key_index, projected_columns_index, relative_version):
+        # search_key_index = DataIndex(search_key_index)
+        # projected_columns_index = [DataIndex(idx) for idx in projected_columns_index]
+
+        ret: list[Record] = []
+        # if search_key is the key_index, then the rid is located by the index
+        # otherwise, locate the rid manually
+        # ...get the updated value for this rid
+        valid_records: list[Record] = []
+        if search_key_index == self.table.key_index:
+            rid = self.table.index.locate(search_key_index, search_key)
+            valid_records.append(self.table.get_record_by_rid(rid))
+        else:
+            for rid in range(1, self.table.last_rid):
+                rec = self.table.get_record_by_rid(rid)
+                if rec.columns[search_key_index] == search_key:
+                    valid_records.append(rec)
+                #     valid_records.append(rid)
+
+        for record in valid_records:
+            col_list = list(record.columns)
+            schema_encoding = record.schema_encoding
+            for i in range(len(col_list)):
+                if projected_columns_index[i] == 0:
+                    col_list[i] = None
+                else:
+                    if record.rid == None:
+                        continue
+                    else:
+                        if helper.ith_bit(schema_encoding, self.table.num_columns, i,
+                                          False) == 0b1:  # check if the column has been updated.
+                            print("detected on schema encoding bit")
+                            assert record.indirection_column is not None, "inconsistent state: schema_encoding bit on but indirection was None"
+                            curr_rid = record.indirection_column
+                            curr_schema_encoding = self.table.get_record_by_rid(curr_rid).schema_encoding
+                            counter = 0
+                            while counter > relative_version or helper.ith_bit(curr_schema_encoding, self.table.num_columns, i, False) == 0b0:
+                                print(
+                                    f"schema encoding {curr_schema_encoding} indicates this record doesn't have the data. ")
+                                temp = self.table.get_record_by_rid(curr_rid)
+                                assert temp.indirection_column is not None
+                                curr_rid = temp.indirection_column
+                                curr_schema_encoding = self.table.get_record_by_rid(curr_rid).schema_encoding
+                                counter -= 1
+                                # curr_rid, curr_schema_encoding = temp.indirection_column, temp.schema_encoding
+                                # curr_indirection = temp
+                            col_list[i] = self.table.get_record_by_rid(curr_rid)[i]
+                    # rec.columns[i] = None  # filter out that column from the projection
+            record.columns = tuple(col_list)
+            ret.append(record)
+
+            # for i, column_value, data_index_indicator in enumerate(zip(rec.columns, projected_columns_index)):
+            #     if data_index_indicator == 1:
+            #         rec.columns[i] = column_value
+            # return [rec]
+            # else:
+            #     return None
+        # self.table.page_ranges.
+        return ret
+
 
     """
     # Update a record with specified key and columns
