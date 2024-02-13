@@ -71,8 +71,8 @@ class Query:
 
         # return
 
-    def insert_tail(self, page_range: PageRange, indirection_column: int, schema_encoding: int,
-                    *columns: int | None) -> int:  # returns RID if successful
+    def insert_tail(self, page_range: PageRange, indirection_column: int, schema_encoding: int, 
+                        *columns: int | None) -> int:  # returns RID if successful
         tail_page = page_range.tail_pages[-1]
         timestamp = int(time.time())
 
@@ -82,6 +82,9 @@ class Query:
 
         key_null_bitmask = self.table.ith_total_col_shift(
             self.table.key_index.toRawIndex())  # this value for the null column makes the key column null
+
+            
+        
         rid = tail_page.insert(
             Metadata(indirection_column, self.table.last_rid, timestamp, schema_encoding, key_null_bitmask), *columns)
 
@@ -340,18 +343,25 @@ class Query:
                         break
                     # page.physical_pages[config.NULL_COLUMN].data[offset*8:offset*8+8] = packed_data
                     tmp_indirection_col = helper.unpack_col(page, config.INDIRECTION_COLUMN, offset)
-                    # tmp_indirection_col = struct.unpack(config.PACKING_FORMAT_STR, page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]
+                    # tmp_indirection_col = struct.unpack(config.PACKING_FORMAT_STR, page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]                
             else:
                 base_dir_entry = self.table.page_directory[base_record.rid]
                 base_dir_entry.page.update_nth_record(base_dir_entry.offset, config.NULL_COLUMN, bitmask)
-
-        base_indirection = self.insert_tail(page_range, tail_indirection, tail_schema_encoding, *updated_columns)
+        
+        base_indirection = self.insert_tail(page_range, tail_indirection, tail_schema_encoding, *updated_columns)     
+        
         success = base_page_dir_entry.page.update_nth_record(base_page_dir_entry.offset, config.INDIRECTION_COLUMN,
                                                              base_indirection)
         assert success, "update not successful"
         success = base_page_dir_entry.page.update_nth_record(base_page_dir_entry.offset, config.SCHEMA_ENCODING_COLUMN,
                                                              tail_schema_encoding)
         assert success, "update not successful"
+
+        if delete:
+            print("BITMASK MOTHERFUCKER: ", bitmask)
+            tail_page_dir_entry = self.table.page_directory[base_indirection]
+            success = tail_page_dir_entry.page.update_nth_record(tail_page_dir_entry.offset, config.NULL_COLUMN, bitmask)
+        
         return success
         # tail_1_indirection = rid if first_update else last_update_rid
 
