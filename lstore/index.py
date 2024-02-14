@@ -20,7 +20,7 @@ class Index:
     class BTree(OOBTree):
         pass
 
-    def locate(self, column, value):
+    def locate(self, column: int, value: int) -> int | None:
         try:
             search_result = self.indices[column][value]
             return search_result
@@ -28,7 +28,7 @@ class Index:
         except:
             return None
 
-    def locate_range(self, begin, end, column):
+    def locate_range(self, begin: int, end: int, column: int) -> list:
         result = []
         for key in range(begin, end + 1):
             locate_result = self.locate(column, key)
@@ -36,11 +36,11 @@ class Index:
                 result.append(locate_result)
         return result
 
-    def create_index(self, column_number):
+    def create_index(self, column_number: int) -> None:
         if self.indices[column_number] is None:
             self.indices[column_number] = self.BTree(t=3)
 
-    def update_index(self, column_number, key, value):
+    def update_index(self, column_number: int, key: int, value: int) -> None:
         if self.indices[column_number] is not None:
             self.indices[column_number].update({key: value})
 

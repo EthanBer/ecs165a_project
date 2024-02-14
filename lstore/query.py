@@ -564,8 +564,34 @@ class Query:
 
     def sum_version(self, start_range: int, end_range: int, aggregate_column_index: DataIndex,
                     relative_version: int) -> int | bool:
-        # TODO: implement
-        return False
+        # TODO: need to fix select_version gives none type
+        s = None
+        # print("hi")
+        # valid_records: list[Record] = []
+        valid_numbers: list[int] = []
+
+        # rids = self.table.index.locate_range(start_range, end_range, aggregate_column_index)
+        # for rid in rids:
+        #     valid_records.append(self.table.get_record_by_rid(rid))
+
+        for key in range(start_range, end_range + 1):
+            projected_cols: list[Literal[0, 1]] = [0] * self.table.num_columns
+            projected_cols[aggregate_column_index] = 1
+            use_idx = True
+            if aggregate_column_index == 1:
+                use_idx = False
+            select_query = self.select_version(key, self.table.key_index, projected_cols, relative_version)
+            if len(select_query) == 0: continue
+            assert len(select_query) == 1, "expected one for primary key"
+            num = select_query[0][aggregate_column_index]
+            assert num is not None
+            valid_numbers.append(num)
+            # valid_records.append(self.select(key, aggregate_column_index, projected_cols)[0])
+        if len(valid_numbers) == 0:
+            return False
+        else:
+            return sum(valid_numbers)
+        return s
 
     """
     incremenets one column of the record
