@@ -283,8 +283,11 @@ class Query:
         # ...get the updated value for this rid
         valid_records: list[Record] = []
         if search_key_index == self.table.key_index:
+            print(search_key_index)
+            print(search_key)
             rid = self.table.index.locate(search_key_index, search_key)
-            valid_records.append(self.table.get_record_by_rid(rid))
+            if self.table.get_record_by_rid(rid) is not None:
+                valid_records.append(self.table.get_record_by_rid(rid))
         else:
             for rid in range(1, self.table.last_rid):
                 rec = self.table.get_record_by_rid(rid)
@@ -575,13 +578,16 @@ class Query:
         # rids = self.table.index.locate_range(start_range, end_range, aggregate_column_index)
         # for rid in rids:
         #     valid_records.append(self.table.get_record_by_rid(rid))
-
-        for key in range(start_range, end_range + 1):
-            projected_cols: list[Literal[0, 1]] = [0] * self.table.num_columns
+        LIST_OF_FUCKING_KEYS = list(self.table.page_directory.keys())
+        start_index = next((i for i, num in enumerate(LIST_OF_FUCKING_KEYS) if num >= start_range), len(LIST_OF_FUCKING_KEYS))
+        end_index = next((i for i, num in enumerate(LIST_OF_FUCKING_KEYS) if num <= end_range), len(LIST_OF_FUCKING_KEYS))
+        for key in LIST_OF_FUCKING_KEYS[start_index:end_index]:
+            projected_cols: list[Literal[0, 1]] = [0] * (self.table.num_columns - 0)
             projected_cols[aggregate_column_index] = 1
             use_idx = True
             if aggregate_column_index == 1:
                 use_idx = False
+          #  rid = self.table.index.locate(self.table.key_index, key)
             select_query = self.select_version(key, self.table.key_index, projected_cols, relative_version)
             if len(select_query) == 0: continue
             assert len(select_query) == 1, "expected one for primary key"
