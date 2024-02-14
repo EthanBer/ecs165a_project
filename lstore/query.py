@@ -276,17 +276,18 @@ class Query:
                        relative_version: int) -> list[Record] | Literal[False]:
         # search_key_index = DataIndex(search_key_index)
         # projected_columns_index = [DataIndex(idx) for idx in projected_columns_index]
-
+      #  print(self.table.page_directory.keys())
         ret: list[Record] = []
         # if search_key is the key_index, then the rid is located by the index
         # otherwise, locate the rid manually
         # ...get the updated value for this rid
         valid_records: list[Record] = []
         if search_key_index == self.table.key_index:
-            print(search_key_index)
-            print(search_key)
+           # print(search_key_index)
+            #print(search_key)
             rid = self.table.index.locate(search_key_index, search_key)
-            if self.table.get_record_by_rid(rid) is not None:
+          #  print(rid)
+            if rid is not None:
                 valid_records.append(self.table.get_record_by_rid(rid))
         else:
             for rid in range(1, self.table.last_rid):
@@ -571,30 +572,22 @@ class Query:
                     relative_version: int) -> int | bool:
         # TODO: need to fix select_version gives none type
         s = None
-        # print("hi")
-        # valid_records: list[Record] = []
-        valid_numbers: list[int] = []
 
-        # rids = self.table.index.locate_range(start_range, end_range, aggregate_column_index)
-        # for rid in rids:
-        #     valid_records.append(self.table.get_record_by_rid(rid))
-        LIST_OF_FUCKING_KEYS = list(self.table.page_directory.keys())
-        start_index = next((i for i, num in enumerate(LIST_OF_FUCKING_KEYS) if num >= start_range), len(LIST_OF_FUCKING_KEYS))
-        end_index = next((i for i, num in enumerate(LIST_OF_FUCKING_KEYS) if num <= end_range), len(LIST_OF_FUCKING_KEYS))
-        for key in LIST_OF_FUCKING_KEYS[start_index:end_index]:
-            projected_cols: list[Literal[0, 1]] = [0] * (self.table.num_columns - 0)
-            projected_cols[aggregate_column_index] = 1
-            use_idx = True
-            if aggregate_column_index == 1:
-                use_idx = False
-          #  rid = self.table.index.locate(self.table.key_index, key)
-            select_query = self.select_version(key, self.table.key_index, projected_cols, relative_version)
-            if len(select_query) == 0: continue
-            assert len(select_query) == 1, "expected one for primary key"
-            num = select_query[0][aggregate_column_index]
-            assert num is not None
-            valid_numbers.append(num)
-            # valid_records.append(self.select(key, aggregate_column_index, projected_cols)[0])
+        valid_numbers: list[int] = []
+        for key in range(start_range, end_range):
+
+                projected_cols: list[Literal[0, 1]] = [0] * (self.table.num_columns - 0)
+                projected_cols[aggregate_column_index] = 1
+                use_idx = True
+                if aggregate_column_index == 1:
+                    use_idx = False
+                select_query = self.select_version(key, self.table.key_index, projected_cols, relative_version)
+                if len(select_query) == 0: continue
+                assert len(select_query) == 1, "expected one for primary key"
+                num = select_query[0][aggregate_column_index]
+                assert num is not None
+                valid_numbers.append(num)
+                # valid_records.append(self.select(key, aggregate_column_index, projected_cols)[0])
         if len(valid_numbers) == 0:
             return False
         else:

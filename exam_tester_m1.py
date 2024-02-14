@@ -99,8 +99,8 @@ keys = sorted(list(records.keys()))
 # aggregate on every column
 for c in range(0, grades_table.num_columns):
     for i in range(0, number_of_aggregates):
-        print('--')
-        print(list(records.keys()))
+      #  print('--')
+    #    print(list(records.keys()))
         r = sorted(sample(range(0, len(keys)), 2))
         # calculate the sum form test directory
         # version -1 sum
