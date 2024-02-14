@@ -69,7 +69,7 @@ for key in records:
         if column != records[key][j]:
             error = True
     if error:
-        print('update error on', records[key], 'and', updated_columns, ':', record, ', correct:', records[key])
+        print('-1 UPDATE update error on', records[key], 'and', updated_columns, ':', record, ', correct:', records[key])
     else:
         pass
         # print('update on', original, 'and', updated_columns, ':', record)
@@ -81,7 +81,7 @@ for key in records:
         if column != records[key][j]:
             error = True
     if error:
-        print('update error on', records[key], 'and', updated_columns, ':', record, ', correct:', records[key])
+        print('-2 UPDATE update error on', records[key], 'and', updated_columns, ':', record, ', correct:', records[key])
     else:
         pass
         # print('update on', original, 'and', updated_columns, ':', record)
@@ -94,6 +94,8 @@ for key in records:
             error = True
     if error:
         print('update error on', records[key], 'and', updated_columns, ':', record, ', correct:', updated_records[key])
+    #else:
+      #  print('workedWORKORWKORKWOKRW')
 
 keys = sorted(list(records.keys()))
 # aggregate on every column 

@@ -216,10 +216,10 @@ class Query:
                 # assert search_key_col is not None,
                 if search_key_col == search_key:
                     valid_records.append(record)
-                    print(f"appending valid record with columns {record.columns}")
+                  #  print(f"appending valid record with columns {record.columns}")
                 else:
-                    print(
-                        f"searched record, its columns {record.columns} was {search_key_col} but wanted {search_key}, moving on")
+                 #   print(
+                 #       f"searched record, its columns {record.columns} was {search_key_col} but wanted {search_key}, moving on")
                     pass
 
         for record in valid_records:
@@ -304,16 +304,13 @@ class Query:
                     else:
                         if helper.ith_bit(schema_encoding, self.table.num_columns, i,
                                           False) == 0b1:  # check if the column has been updated.
-                            print("detected on schema encoding bit")
                             assert record.indirection_column is not None, "inconsistent state: schema_encoding bit on but indirection was None"
                             curr_rid = record.indirection_column
                             curr_schema_encoding = self.table.get_record_by_rid(curr_rid).schema_encoding
-                            counter = 1
+                            counter = 0
                             overversioned = False
                             while counter > relative_version or helper.ith_bit(curr_schema_encoding,
                                                                                self.table.num_columns, i, False) == 0b0:
-                                print(
-                                    f"schema encoding {curr_schema_encoding} indicates this record doesn't have the data. ")
                                 temp = self.table.get_record_by_rid(curr_rid)
                                 if temp is None:
                                     overversioned = True
