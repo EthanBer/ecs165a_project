@@ -8,7 +8,6 @@ from lstore.ColumnIndex import DataIndex, RawIndex
 from lstore.page import Page
 from lstore.page_range import PageRange
 from lstore.record_physical_page import Record
-
 # from lstore.ColumnIndex import RawIndex, DataIndex
 
 INDIRECTION_COLUMN = 0
@@ -84,5 +83,5 @@ class Table:
 
     # def _update_record_by_id()
     # def __merge(self):
-    #     # print("merge is happening")
+    #     print("merge is happening")
     #     pass

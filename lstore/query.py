@@ -71,8 +71,8 @@ class Query:
 
         # return
 
-    def insert_tail(self, page_range: PageRange, indirection_column: int, schema_encoding: int, 
-                        *columns: int | None) -> int:  # returns RID if successful
+    def insert_tail(self, page_range: PageRange, indirection_column: int, schema_encoding: int,
+                    *columns: int | None) -> int:  # returns RID if successful
         tail_page = page_range.tail_pages[-1]
         timestamp = int(time.time())
 
@@ -83,8 +83,6 @@ class Query:
         key_null_bitmask = self.table.ith_total_col_shift(
             self.table.key_index.toRawIndex())  # this value for the null column makes the key column null
 
-            
-        
         rid = tail_page.insert(
             Metadata(indirection_column, self.table.last_rid, timestamp, schema_encoding, key_null_bitmask), *columns)
 
@@ -180,7 +178,7 @@ class Query:
         # otherwise, locate the rid manually
         # ...get the updated value for this rid
         valid_records: list[Record] = []
-        if search_key_index == self.table.key_index: # 
+        if search_key_index == self.table.key_index:  #
             rid = self.table.index.locate(search_key_index, search_key)
             if rid is not None:
                 valid_records.append(self.table.get_record_by_rid(rid))
@@ -191,16 +189,16 @@ class Query:
                 if record.base_record == False:
                     continue
                 # print(f"record cols was {record.columns}")
-                search_key_col: int | None = record[search_key_index] # default to base page
+                search_key_col: int | None = record[search_key_index]  # default to base page
                 # if rec[search_key_index] == search_key:
                 #     valid_records.append(rec)
                 #     valid_records.append(rid)
 
-                # get the latest version 
+                # get the latest version
                 # col_list = list(record.columns)
                 schema_encoding = record.schema_encoding
                 if helper.ith_bit(schema_encoding, self.table.num_columns, search_key_index,
-                                    False) == 0b1:  # check if the column has been updated.
+                                  False) == 0b1:  # check if the column has been updated.
                     # print("detected on schema encoding bit")
                     assert record.indirection_column is not None, "inconsistent state: schema_encoding bit on but indirection was None"
                     curr_rid = record.indirection_column
@@ -220,10 +218,10 @@ class Query:
                     valid_records.append(record)
                     print(f"appending valid record with columns {record.columns}")
                 else:
-                    print(f"searched record, its columns {record.columns} was {search_key_col} but wanted {search_key}, moving on")
+                    print(
+                        f"searched record, its columns {record.columns} was {search_key_col} but wanted {search_key}, moving on")
                     pass
 
-        
         for record in valid_records:
             col_list = list(record.columns)
             # print(f"col_list was {col_list}")
@@ -236,7 +234,7 @@ class Query:
                         continue
                     else:
                         if helper.ith_bit(schema_encoding, self.table.num_columns, i,
-                                            False) == 0b1:  # check if the column has been updated.
+                                          False) == 0b1:  # check if the column has been updated.
                             # print("detected on schema encoding bit")
                             assert record.indirection_column is not None, "inconsistent state: schema_encoding bit on but indirection was None"
                             curr_rid = record.indirection_column
@@ -274,7 +272,8 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
 
-    def select_version(self, search_key: int, search_key_index: DataIndex, projected_columns_index: list[Literal[0, 1]], relative_version: int) -> list[Record] | Literal[False]:
+    def select_version(self, search_key: int, search_key_index: DataIndex, projected_columns_index: list[Literal[0, 1]],
+                       relative_version: int) -> list[Record] | Literal[False]:
         # search_key_index = DataIndex(search_key_index)
         # projected_columns_index = [DataIndex(idx) for idx in projected_columns_index]
 
@@ -309,18 +308,23 @@ class Query:
                             assert record.indirection_column is not None, "inconsistent state: schema_encoding bit on but indirection was None"
                             curr_rid = record.indirection_column
                             curr_schema_encoding = self.table.get_record_by_rid(curr_rid).schema_encoding
-                            counter = 0
-                            while counter > relative_version or helper.ith_bit(curr_schema_encoding, self.table.num_columns, i, False) == 0b0:
+                            counter = 1
+                            overversioned = False
+                            while counter > relative_version or helper.ith_bit(curr_schema_encoding,
+                                                                               self.table.num_columns, i, False) == 0b0:
                                 print(
                                     f"schema encoding {curr_schema_encoding} indicates this record doesn't have the data. ")
                                 temp = self.table.get_record_by_rid(curr_rid)
                                 if temp is None:
+                                    overversioned = True
                                     break
                                 curr_rid = temp.indirection_column
                                 curr_schema_encoding = self.table.get_record_by_rid(curr_rid).schema_encoding
                                 counter -= 1
                                 # curr_rid, curr_schema_encoding = temp.indirection_column, temp.schema_encoding
                                 # curr_indirection = temp
+                            if overversioned is True :
+                                curr_rid = record.indirection_column
                             col_list[i] = self.table.get_record_by_rid(curr_rid)[i]
                     # rec.columns[i] = None  # filter out that column from the projection
             record.columns = tuple(col_list)
@@ -352,8 +356,9 @@ class Query:
             return False
         primary_key_matches = self.select(primary_key, self.table.key_index, [1] * len(columns))
         # print(primary_key_matches)
-        assert len(primary_key_matches) == 1, f"only one primary key match for select, len was {len(primary_key_matches)}"
-            
+        assert len(
+            primary_key_matches) == 1, f"only one primary key match for select, len was {len(primary_key_matches)}"
+
         if len(primary_key_matches) != 1:
             return False
         # assert len(primary_key_matches) == 1 # primary key results in ONE select result
@@ -371,10 +376,10 @@ class Query:
         column_first_update: bool = False
 
         updated_columns: list[int | None] = [None] * self.table.num_columns
-        if updated_columns == list(columns): # all Nones were passed in, do nothing.
+        if updated_columns == list(columns):  # all Nones were passed in, do nothing.
             return True
         # print(f"columns passed were {columns}")
-        for i, column in enumerate(columns): # you can't change a value to None, unfortuntately. 
+        for i, column in enumerate(columns):  # you can't change a value to None, unfortuntately.
             if column is not None:
                 updated_columns[i] = column
                 schema_shift = helper.ith_total_col_shift(self.table.num_columns, i, False)
@@ -388,12 +393,11 @@ class Query:
         if not delete:
             # if base_record.indirection_column is not None:
             #     tail_indirection = base_record.indirection_column
-                # new_record_values.append([])
-                # ... put tail record
+            # new_record_values.append([])
+            # ... put tail record
             # if not tail_page.has_capacity(2 if first_update else 1):
             #     tail_page = TailPage(page_range, page_range.num_columns)
             #     page_range.append_tail_page(tail_page)
-
 
             if column_first_update:
                 tail_indirection = self.insert_tail(page_range, tail_1_indirection, tail_1_schema_encoding,
@@ -401,7 +405,8 @@ class Query:
             else:
                 # if not column_first_update, at least one bit in the schema encoding had to be a 1
                 # in that case, we know the record should an indirection column, since it was updated
-                assert isinstance(base_record.indirection_column, int), f"inconsistent state: expected base record's indirection column to be an integer but instead got {type(base_record.indirection_column)}. columns was {columns}"
+                assert isinstance(base_record.indirection_column,
+                                  int), f"inconsistent state: expected base record's indirection column to be an integer but instead got {type(base_record.indirection_column)}. columns was {columns}"
                 tail_indirection = base_record.indirection_column
                 # if last_update_rid:
                 #     last_update_page_dir_entry = self.table.page_directory[last_update_rid]
@@ -410,11 +415,10 @@ class Query:
 
                 # prev_schema_encoding = self.table.get_record_by_rid(tail_indirection).schema_encoding
 
-
                 # prev_schema_encoding = last_update_page_dir_entry["page"].get_nth_record(
                 #     last_update_page_dir_entry["offset"]).schema_encoding
                 # tail_schema_encoding |= prev_schema_encoding  # if first_update, these two should be the same. but if not then it might change
-                
+
 
 
         else:
@@ -440,18 +444,18 @@ class Query:
                     # Append the packed bytes to the bytearray
                     page.update_nth_record(offset, config.NULL_COLUMN,
                                            bitmask)  # the other bits in the null column no longer matter because they are deleted
-                    page.update_nth_record(offset, config.RID_COLUMN, 0b0) # set the RID to null
+                    page.update_nth_record(offset, config.RID_COLUMN, 0b0)  # set the RID to null
                     if isinstance(page, BasePage):
                         break
                     # page.physical_pages[config.NULL_COLUMN].data[offset*8:offset*8+8] = packed_data
                     tmp_indirection_col = helper.unpack_col(page, config.INDIRECTION_COLUMN, offset)
-                    # tmp_indirection_col = struct.unpack(config.PACKING_FORMAT_STR, page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]                
+                    # tmp_indirection_col = struct.unpack(config.PACKING_FORMAT_STR, page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]
             else:
                 base_dir_entry = self.table.page_directory[base_record.rid]
                 base_dir_entry.page.update_nth_record(base_dir_entry.offset, config.NULL_COLUMN, bitmask)
-        
-        base_indirection = self.insert_tail(page_range, tail_indirection, tail_schema_encoding, *updated_columns)     
-        
+
+        base_indirection = self.insert_tail(page_range, tail_indirection, tail_schema_encoding, *updated_columns)
+
         success = base_page_dir_entry.page.update_nth_record(base_page_dir_entry.offset, config.INDIRECTION_COLUMN,
                                                              base_indirection)
         assert success, "update not successful"
@@ -526,12 +530,13 @@ class Query:
             # valid_records.append(self.select(key, aggregate_column_index, projected_cols)[0])
         if len(valid_numbers) == 0:
             return False
-        else: return sum(valid_numbers)
+        else:
+            return sum(valid_numbers)
 
         # for record in valid_records:
         #     if s is None:
         #         s = 0
-        #     to_add = record[aggregate_column_index] 
+        #     to_add = record[aggregate_column_index]
         #     assert to_add is not None, "the thing to add was None inside sum"
         #     s += to_add
         # if s is None:
@@ -540,16 +545,16 @@ class Query:
         # for rid in rids:
         #     record = self.table.get_record_by_rid(rid)
         #     s += record[aggregate_column_index]
-            # schema_encoding = record.schema_encoding
-            # if helper.ith_bit(schema_encoding, self.table.num_columns, aggregate_column_index,
-            #                   False) == 0b1:
-                
-            #     assert record.indirection_column is not None
-            #     curr: int = record.indirection_column
-            #     while self.table.get_record_by_rid(curr).columns[aggregate_column_index] == 0:
-            #         temp = self.table.get_record_by_rid(curr).indirection_column
-            #         curr = temp
-            #     s += self.table.get_record_by_rid(record.indirection_column)[aggregate_column_index]
+        # schema_encoding = record.schema_encoding
+        # if helper.ith_bit(schema_encoding, self.table.num_columns, aggregate_column_index,
+        #                   False) == 0b1:
+
+        #     assert record.indirection_column is not None
+        #     curr: int = record.indirection_column
+        #     while self.table.get_record_by_rid(curr).columns[aggregate_column_index] == 0:
+        #         temp = self.table.get_record_by_rid(curr).indirection_column
+        #         curr = temp
+        #     s += self.table.get_record_by_rid(record.indirection_column)[aggregate_column_index]
         return s
 
     """
