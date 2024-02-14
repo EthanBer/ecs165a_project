@@ -574,20 +574,19 @@ class Query:
         s = None
 
         valid_numbers: list[int] = []
-        for key in range(start_range, end_range):
-
-                projected_cols: list[Literal[0, 1]] = [0] * (self.table.num_columns - 0)
-                projected_cols[aggregate_column_index] = 1
-                use_idx = True
-                if aggregate_column_index == 1:
-                    use_idx = False
-                select_query = self.select_version(key, self.table.key_index, projected_cols, relative_version)
-                if len(select_query) == 0: continue
-                assert len(select_query) == 1, "expected one for primary key"
-                num = select_query[0][aggregate_column_index]
-                assert num is not None
-                valid_numbers.append(num)
-                # valid_records.append(self.select(key, aggregate_column_index, projected_cols)[0])
+        for key in range(start_range, end_range + 1):
+            projected_cols: list[Literal[0, 1]] = [0] * (self.table.num_columns - 0)
+            projected_cols[aggregate_column_index] = 1
+            use_idx = True
+            if aggregate_column_index == 1:
+                use_idx = False
+            select_query = self.select_version(key, self.table.key_index, projected_cols, relative_version)
+            if len(select_query) == 0: continue
+            assert len(select_query) == 1, "expected one for primary key"
+            num = select_query[0][aggregate_column_index]
+            assert num is not None
+            valid_numbers.append(num)
+            # valid_records.append(self.select(key, aggregate_column_index, projected_cols)[0])
         if len(valid_numbers) == 0:
             return False
         else:
