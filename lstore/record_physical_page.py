@@ -34,7 +34,7 @@ class PhysicalPage:
 
     def __init__(self) -> None:
         # self.size = 8192
-        self.size = 4096
+        self.size = config.PHYSICAL_PAGE_SIZE
         self.data = bytearray(self.size)
         self.offset = 0
 

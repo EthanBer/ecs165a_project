@@ -11,8 +11,9 @@ class config:
 	NUM_METADATA_COL = 5
 	
 	INDENT = "    " # Use "\t"
-	PAGES_PER_PAGERANGE = 16
+	PAGES_PER_PAGERANGE = 16 
 	PACKING_FORMAT_STR = ">Q"
+	PHYSICAL_PAGE_SIZE = 16384
 
 
 class Metadata:

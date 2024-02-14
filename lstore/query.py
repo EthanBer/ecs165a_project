@@ -158,6 +158,7 @@ class Query:
 
         return True
 
+    # gets the most up-to-date column value for a record.
     def get_updated_col(self, record: Record, col_idx: DataIndex) -> int | None:
         desired_col: int | None = record[col_idx]  # default to base page
         schema_encoding = record.schema_encoding
