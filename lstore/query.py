@@ -286,8 +286,8 @@ class Query:
            # print(search_key_index)
             #print(search_key)
             rid = self.table.index.locate(search_key_index, search_key)
-          #  print(rid)
             if rid is not None:
+                # raise(Exception("select should not be called on a key that doesn't exist"))
                 valid_records.append(self.table.get_record_by_rid(rid))
         else:
             for rid in range(1, self.table.last_rid):
@@ -308,6 +308,7 @@ class Query:
                     else:
                         if helper.ith_bit(schema_encoding, self.table.num_columns, i,
                                           False) == 0b1:  # check if the column has been updated.
+                            # print("detected on schema encoding bit")
                             assert record.indirection_column is not None, "inconsistent state: schema_encoding bit on but indirection was None"
                             curr_rid = record.indirection_column
                             curr_schema_encoding = self.table.get_record_by_rid(curr_rid).schema_encoding
@@ -319,6 +320,7 @@ class Query:
                                 if temp is None:
                                     overversioned = True
                                     break
+                                assert temp.indirection_column is not None, "looped back to base record? indirection_column == None"
                                 curr_rid = temp.indirection_column
                                 curr_schema_encoding = self.table.get_record_by_rid(curr_rid).schema_encoding
                                 counter -= 1
@@ -570,7 +572,6 @@ class Query:
 
     def sum_version(self, start_range: int, end_range: int, aggregate_column_index: DataIndex,
                     relative_version: int) -> int | bool:
-        # TODO: need to fix select_version gives none type
         s = None
 
         valid_numbers: list[int] = []
@@ -581,17 +582,19 @@ class Query:
             if aggregate_column_index == 1:
                 use_idx = False
             select_query = self.select_version(key, self.table.key_index, projected_cols, relative_version)
-            if len(select_query) == 0: continue
-            assert len(select_query) == 1, "expected one for primary key"
-            num = select_query[0][aggregate_column_index]
+            if select_query == False or len(select_query) == 0: continue
+            assert len(select_query) == 1, "expected one for primary key but got " + str(len(select_query))
+            record = select_query[0]
+            if record.base_record == False:
+                continue
+            num = record[aggregate_column_index]
             assert num is not None
             valid_numbers.append(num)
             # valid_records.append(self.select(key, aggregate_column_index, projected_cols)[0])
         if len(valid_numbers) == 0:
             return False
-        else:
-            return sum(valid_numbers)
-        return s
+        else: return sum(valid_numbers)
+
 
     """
     incremenets one column of the record
