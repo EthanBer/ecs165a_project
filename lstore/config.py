@@ -14,6 +14,10 @@ class config:
 	PAGES_PER_PAGERANGE = 16 
 	PACKING_FORMAT_STR = ">Q"
 	PHYSICAL_PAGE_SIZE = 16384
+	
+	ID_COUNT = 1 # Is to make sure we dont have two files with the same name
+	PATH = ".\Pages"
+
 
 
 class Metadata:

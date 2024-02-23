@@ -6,11 +6,11 @@ from lstore.config import config, Metadata
 from lstore.helper import helper
 
 
-
 class Page:
     def __init__(self, num_columns: int, key_index : DataIndex):
         self.key_index = key_index
-        self.id = random.randrange(1, int(1e10))    # This ID is just for debugging purposes
+        self.id = config.ID_COUNT
+        config.ID_COUNT += 1
 
         self.num_records = 0
         self.physical_pages: list[PhysicalPage] = []
@@ -28,9 +28,12 @@ class Page:
         self.physical_page_size: int = self.physical_pages[0].size
         # assert len(self.physical_pages) == num_columns
 
-    # def __str__(self) -> str:
+        # Create a file for the page
+        open(config.PATH + "\\" + str(self.id), 'wb')
         
-    #     for physical_page in self.physical_pages:
+                
+
+   
     
     @property
     def high_level_str(self) -> str:
