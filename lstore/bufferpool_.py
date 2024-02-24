@@ -6,12 +6,14 @@ from lstore.config import Metadata, config
 from lstore.helper import helper
 from lstore.page import Page
 from lstore.record_physical_page import PhysicalPage, Record
-from typing import TypeVar, Generic, Annotated
+from typing import Literal, TypeVar, Generic, Annotated
 from __future__ import annotations
 
 from lstore.table import Table
 
 class PageID(int):
+	class Catalog:
+		pass
 	pass
 
 class BasePageID(PageID):
@@ -65,9 +67,10 @@ class Bufferpool:
 	def insert_record(self, table_name: str, metadata: Metadata, *columns: int) -> int: # returns RID of inserted record
 		self.file_handlers[table_name].insert_record(metadata, columns)
 
-		if full:
-			self.file_handler.write_page(self.page_to_commit, self.last_base_page_id)
-			self.last_base_page_id += 1
+
+		# if full:
+		# 	self.file_handler.write_page(self.page_to_commit, self.last_base_page_id)
+		# 	self.last_base_page_id += 1
 
 	"""
 	def get_record_by_rid(self, rid: int) -> Buffered[Record]:
@@ -77,22 +80,43 @@ class Bufferpool:
 	
 	"""
 
-class BufferedValue(Generic[T]):
-	def __init__(self, initial_value: T, file_handler: FileHandler, page_id: PageID, byte_position: int):
-		self.value = initial_value
-		self.page_id = page_id
+
+class BufferedValue():
+	def __init__(self, file_handler: FileHandler, page_sub_path: PageID | Literal["catalog"], byte_position: int):
+		page_path = file_handler.page_id_to_path(page_sub_path) if isinstance(page_sub_path, PageID) else file_handler.catalog_path
+		with open(page_path) as file:
+			file.seek(byte_position)
+			self._value = int(file.read(8)) # assume buffered value is 8 bytes
+		self.page_path = page_path
 		self.file_handler = file_handler
 		self.byte_position = byte_position
-	def flush(self):
-		self.
+	def flush(self) -> None:
+		FileHandler.write_position(self.page_path, self.byte_position, self._value)
+
+
+	def value(self, increment: int=0) -> int:
+		if increment != 0:
+			self._value += increment 
+		return self._value
+
+	def __del__(self) -> None: # flush when this value is deleted
+		self.flush()
 	
-
-
 class FileHandler:
 	def __init__(self, table: Table) -> None:
-		self.last_base_page_id = self.get_last_base_page_id()
+		# self.last_base_page_id = self.get_last_base_page_id()
+		self.last_base_page_id = BufferedValue(self, "catalog", config.byte_position.CATALOG_LAST_BASE_ID)
+		self.last_tail_page_id = BufferedValue(self, "catalog", config.byte_position.CATALOG_LAST_TAIL_ID)
+		self.last_metadata_page_id = BufferedValue(self, "catalog", config.byte_position.CATALOG_LAST_METADATA_ID)
+		# TODO: populate the offset byte with 0 when creating a new page
+		self.offset = BufferedValue(self, BasePageID(self.last_base_page_id.value() - 1), config.byte_position.BASE_OFFSET) # the current offset is based on the last written page
 		self.table = table
-		self.page_to_commit: Annotated[list[PhysicalPage], self.table.total_columns] = self.read_base_page(self.last_base_page_id) # could be empty PhysicalPages, to start
+		self.page_to_commit: Annotated[list[PhysicalPage], self.table.total_columns] = self.read_base_page(self.last_base_page_id.value()) # could be empty PhysicalPages, to start
+		# check that physical page sizes and offsets are the same
+		assert len(
+			set(map(lambda physicalPage: physicalPage.size, self.page_to_commit))) <= 1
+		assert len(
+			set(map(lambda physicalPage: physicalPage.offset, self.page_to_commit))) <= 1
 		self.table_path = os.path.join(config.PATH, self.table.name)
 	def base_path(self, base_page_id: int) -> str:
 		return os.path.join(self.table_path, f"base_{base_page_id}")
@@ -108,25 +132,30 @@ class FileHandler:
 		return os.path.join(self.table_path, "catalog")
 		# return os.path.join(config.PATH, self.table.name, "catalog")
 
-	def get_last_base_page_id(self) -> int: # writing boolean specifies whether this id will be written to by the user.
-		with open(self.catalog_path, "r") as file:
-			return int(file.read(8))
+	# def get_last_ids(self) -> tuple[int, int, int]: # writing boolean specifies whether this id will be written to by the user.
+	# 	with open(self.catalog_path, "r") as file:
+	# 		return (int(file.read(8)), int(file.read(8)), int(file.read(8)))
 
-	def write_position(self, page_id: PageID, byte_position: int, value: int):
+	def page_id_to_path(self, page_id: PageID) -> str:
 		path: str = ""
-		if isinstance(self.page_id, BasePageID):
-			path = self.file_handler.base_path(self.page_id)
-		elif isinstance(self.page_id, TailPageID):
-			path = self.file_handler.tail_path(self.page_id)
-		elif isinstance(self.page_id, MetadataPageID):
-			path = self.file_handler.metadata_path(self.page_id)
+		if isinstance(page_id, BasePageID):
+			path = self.base_path(page_id)
+		elif isinstance(page_id, TailPageID):
+			path = self.tail_path(page_id)
+		elif isinstance(page_id, MetadataPageID):
+			path = self.metadata_path(page_id)
 		else:
 			raise(Exception(f"page_id had unexpected type of {type(page_id)}"))
-		with open(path, "w") as file:
-			file.seek(byte_position)
-			file.write(value)
+		return path
 
-	def write_new_page(self, physical_pages: list[PhysicalPage], base_page_id: int) -> bool: # the page MUST be full in order to write. returns true if success
+	@staticmethod
+	def write_position(page_path: str, byte_position: int, value: int) -> bool:
+		with open(page_path, "w") as file:
+			file.seek(byte_position)
+			file.write(str(value))
+		return True
+
+	def write_new_base_page(self, physical_pages: list[PhysicalPage], base_page_id: int) -> bool: # the page MUST be full in order to write. returns true if success
 		bpath = self.base_path(base_page_id)
 
 		# check that physical page sizes and offsets are the same
@@ -135,14 +164,15 @@ class FileHandler:
 		assert len(
 			set(map(lambda physicalPage: physicalPage.offset, physical_pages))) <= 1
 
-		metadata_pointer = 
-		offset = physical_pages[0].offset
+		metadata_pointer = self.last_metadata_page_id.value(1)
 
 		with open(bpath, "wb") as file:
-			file.write()
+			file.write(metadata_pointer.to_bytes(config.BYTES_PER_INT, byteorder="big"))
+			file.write((16).to_bytes(8, byteorder="big"))
 			for physical_page in physical_pages:
 				file.write(physical_page.data)
 		return True
+
 	def read_base_page(self, base_page_id: int) -> list[PhysicalPage]: # reads the full base page written to disk
 		physical_pages: list[PhysicalPage] = []
 		with open(self.base_path(base_page_id), "rb") as file: 
@@ -168,15 +198,18 @@ class FileHandler:
 		
 		# Transform columns to a list to append the schema encoding and the indirection column
 		# print(columns)
-		list_columns = list(columns)
+		list_columns: list[int | None] = list(columns)
 		list_columns.insert(config.INDIRECTION_COLUMN, metadata.indirection_column)
 		list_columns.insert(config.RID_COLUMN, metadata.rid)
 		list_columns.insert(config.TIMESTAMP_COLUMN, metadata.timestamp)
 		list_columns.insert(config.SCHEMA_ENCODING_COLUMN, metadata.schema_encoding)
 		list_columns.insert(config.NULL_COLUMN, null_bitmask)
-		columns = tuple(list_columns)
-		for i, physical_page in enumerate(self.page_to_commit):
-			physical_page.insert(columns[i])
+		cols = tuple(list_columns)
+		for i in range(len(self.page_to_commit)):
+			self.page_to_commit[i].insert(cols[i])
+			self.offset.value(config.BYTES_PER_INT)
+		if self.offset == config.PHYSICAL_PAGE_SIZE:
+			self.write_new_base_page(self.page_to_commit, self.last_base_page_id.value(1))	
 		return True
 
 	

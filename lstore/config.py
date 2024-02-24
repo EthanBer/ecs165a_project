@@ -20,6 +20,19 @@ class config:
 
 	BUFFERPOOL_SIZE = 256
 
+	class byte_position:
+		BASE_METADATA_PTR = 0
+		BASE_OFFSET = 8 
+		TAIL_OFFSET = 0
+		CATALOG_LAST_BASE_ID = 0
+		CATALOG_LAST_TAIL_ID = 8
+		CATALOG_LAST_METADATA_ID = 16
+		CATALOG_LAST_RID = 32
+
+	BYTES_PER_INT = 8	
+
+
+
 
 
 class Metadata:
