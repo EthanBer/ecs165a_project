@@ -59,6 +59,8 @@ class Bufferpool:
 	def __init__(self, path, tables: list[Table]) -> None: 
 		self.pin_counts: Annotated[list[int], config.BUFFERPOOL_SIZE] = [0] * config.BUFFERPOOL_SIZE
 		self.buffered_physical_pages: Annotated[list[PhysicalPage | None], config.BUFFERPOOL_SIZE] = [None] * config.BUFFERPOOL_SIZE
+		self.buffered_metadata = [[]]
+
 		self.tables = tables
 		# self.file_handlers = {table.name: FileHandler(table) for table in self.tables} # create FileHandlers for each table
 		# self.table_for_physical_pages: Annotated[list[str | None], config.BUFFERPOOL_SIZE] = [None] * config.BUFFERPOOL_SIZE
@@ -71,8 +73,6 @@ class Bufferpool:
 	def change_pin_count(self, buff_indices: list[int], change: int) -> None:
 		for idx in buff_indices:
 			self.pin_counts[idx] += change
-
-
 
 
 	def insert_record(self, table_name: str, metadata: Metadata, *columns: int) -> int: # returns RID of inserted record
@@ -95,7 +95,8 @@ class Bufferpool:
 	"""
 
 
-	def is_record_in_bufferpool(self, table_name : str, record_id : int, projected_columns_index: list[Literal[0] | Literal[1]]): ## this will be called inside the bufferpool functions
+
+	def is_record_in_bufferpool(self, table_name : str, record_id : int, projected_columns_index: list[Literal[0] | Literal[1]]) -> Record | None: ## this will be called inside the bufferpool functions
 		table = None
 		for curr_table in self.tables:
 			if curr_table.name == table_name:
@@ -107,17 +108,86 @@ class Bufferpool:
 				break 
 		record_page=page_directory_entry.page
 
-
 		number_of_columns = sum(projected_columns_index)
 		num_of_columns_found = 0
+		#column_list = [None] * len(projected_columns_index)
+
 		for i in range(len(self.ids_of_physical_pages)):
 			if (self.ids_of_physical_pages[i] == record_page.id) and (projected_columns_index[i] == 1):
+				#column_list[i] = self.buffered_physical_pages[i].data
 				num_of_columns_found += 1
 
+		#def __init__(self, indirection_column: int | None, schema_encoding: int, null_column: int | None):
+		#metadata= Metadata()  #find this in the metadata file
+		
+
+		#record=Record(metadata, column_list)
+		#return record 
 		return num_of_columns_found == number_of_columns
 
-	def get_record(self, record: rid):
-		pass
+
+	def bring_from_disk(self, table_name : str, record_id : int, projected_columns_index: list[Literal[0] | Literal[1]]):
+		table_path = os.path.join(self.path, table_name)
+
+		table = None
+		for curr_table in self.tables:
+			if curr_table.name == table_name:
+				table = curr_table
+		
+		for key in table.page_directory.keys:
+			if key== record_id:
+				page_directory_entry = table.page_directory[key]
+				break 
+		record_page_id = page_directory_entry.page_id
+		
+		#list_columns = []
+		for file_name in os.listdir(path):
+			if file_name == "*$" + record_page_id:
+				path = os.path.join(table_path, file_name)
+				with open(path, 'rb') as file:
+					metadata_id = int.from_bytes(file.read(8))
+					offset = int.from_bytes(file.read(8))
+					
+					size_physical_pages = len(projected_columns_index) * offset
+					for i in range(len(projected_columns_index)):
+						if projected_columns_index[i] == 1:
+							data = bytearray(file.read(size_physical_pages))
+							physical_page = PhysicalPage(data, offset)
+							self.buffered_physical_pages.append(physical_page)
+							self.pin_counts.append(0) # discuss
+							self.ids_of_physical_pages.append(record_page_id)
+							self.index_of_physical_page_in_the_page.append(i)
+							self.dirty_bits.append(False)
+							#list_columns.append(physical_page)
+						else:
+							file.seek(size_physical_pages, 1)
+		
+		path = os.path.join(table_path, "metadata$"+str(metadata_id))
+		list_metadata=[]
+		with open(path, 'rb') as file:
+			for i in range(config.NUM_METADATA_COL):
+				data = bytearray(file.read(size_physical_pages))
+				physical_page = PhysicalPage(data)
+				
+				list_metadata.append(physical_page)
+			self.buffered_metadata.append(list_metadata)
+
+
+		
+
+
+
+
+			
+
+
+
+
+
+	def get_record(self, table_name : str, record_id : int, projected_columns_index: list[Literal[0] | Literal[1]]):
+		if self.is_record_in_bufferpool(table_name, record_id, projected_columns_index):
+			pass
+
 
 
 	def evict_physcical_page_clock(self) -> bool:
@@ -169,6 +239,7 @@ class BufferedValue():
 	def __del__(self) -> None: # flush when this value is deleted
 		self.flush()
 	
+
 class FileHandler:
 	def __init__(self, table: 'Table') -> None:
 		# self.last_base_page_id = self.get_last_base_page_id()

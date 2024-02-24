@@ -52,7 +52,7 @@ class Database():
                 new_page_range.tail_pages=[]
                 list_page_ranges.append(new_page_range)
                 num_page = 0
-
+                
                 for file in os.listdir(newpath):
                     if file == "*page*":
                         page_id=int(file.split("$")[1]) # take the page id, may not work :( 
@@ -96,7 +96,8 @@ class Database():
 
 
     def close(self):
-        pass
+        
+        
     """
 
     """
