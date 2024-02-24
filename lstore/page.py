@@ -9,8 +9,8 @@ from lstore.helper import helper
 class Page:
     def __init__(self, num_columns: int, key_index : DataIndex):
         self.key_index = key_index
-        self.id = config.ID_COUNT
-        config.ID_COUNT += 1
+        # self.id = config.ID_COUNT config.ID_COUNT += 1
+        self.debugging_id = random.randint(0, 10^6)
 
         self.num_records = 0
         self.physical_pages: list[PhysicalPage] = []
@@ -28,8 +28,8 @@ class Page:
         self.physical_page_size: int = self.physical_pages[0].size
         # assert len(self.physical_pages) == num_columns
 
-        # Create a file for the page
-        open(config.PATH + "\\" + str(self.id), 'wb')
+        # # Create a file for the page
+        # open(config.PATH + "\\" + str(self.id), 'wb')
         
                 
 
@@ -37,7 +37,7 @@ class Page:
     
     @property
     def high_level_str(self) -> str:
-        return f"Page id {self.id} starting with RID{self.physical_pages[config.RID_COLUMN].__get_nth_record__(0)}"
+        return f"Page id {self.debugging_id} starting with RID{self.physical_pages[config.RID_COLUMN].__get_nth_record__(0)}"
 
     def __str__(self) -> str:
         newline = "\n"

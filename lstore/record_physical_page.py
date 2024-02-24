@@ -1,28 +1,40 @@
 import struct
+from typing import Annotated
 from lstore.config import Metadata, config
 from lstore.helper import helper
 
 
 class Record:
-    def __init__(self, metadata: Metadata, key: int | None, base_record: bool, *columns : int | None):
-        self.indirection_column = metadata.indirection_column
-        self.timestamp = metadata.timestamp
-        self.rid = metadata.rid
-        self.schema_encoding = metadata.schema_encoding
-        self.key = key
+    def __init__(self, metadata: Metadata, *columns : int | None):
+        # self.indirection_column = metadata.indirection_column
+        # self.timestamp = metadata.timestamp
+        # self.rid = metadata.rid
+        # self.schema_encoding = metadata.schema_encoding
         self.metadata = metadata
         self.columns = columns
-        self.base_record = base_record
+        # self.key = key
+        # self.base_record = base_record
 
     def __getitem__(self, key: int) -> int | None:
         # this syntax is used in the increment() function of query.py, so this operator should be implemented
         return self.columns[key]
          #return col_list[key]
 
+
+class BaseRecord(Record):
+    def __init__(self, metadata: Metadata, key: int, *columns: int | None):
+        super().__init__(metadata, *columns)
+        self.key = key
     def __str__(self) -> str:
         # NOTE: the self.columns is just the physical values in the columns. 
         # if the physical value is 0, the actual value could be 0 or None depending on the corresponding NULL_COLUMN value
-        return f"Record RID{self.rid}; idr:{self.indirection_column}; senc:{bin(self.schema_encoding)}; key:{self.key}; columns:{self.columns}"
+        return f"BaseRecord RID{self.metadata.rid}; idr:{self.metadata.indirection_column}; senc:{bin(self.metadata.schema_encoding)}; key:{self.key}; columns:{self.columns}"
+
+class TailRecord(Record):
+    def __str__(self) -> str:
+        # NOTE: the self.columns is just the physical values in the columns. 
+        # if the physical value is 0, the actual value could be 0 or None depending on the corresponding NULL_COLUMN value
+        return f"TailRecord RID{self.metadata.rid}; idr:{self.metadata.indirection_column}; senc:{bin(self.metadata.schema_encoding)}; columns:{self.columns}"
 
 # class BaseRecord(Record):
 #     pass
@@ -32,15 +44,11 @@ class Record:
 
 class PhysicalPage:
 
-    def __init__(self) -> None:
+    def __init__(self, data: bytearray=bytearray(config.PHYSICAL_PAGE_SIZE), offset: int=0) -> None:
         # self.size = 8192
         self.size = config.PHYSICAL_PAGE_SIZE
-        self.data = bytearray(self.size)
-        self.offset = 0
-        
-
-       
-
+        self.data = data
+        self.offset = offset
 
     def insert(self, value: int | None) -> None:
         # Pack the 64-bit integer into bytes (using '>Q' format for unsigned long long with big endian)

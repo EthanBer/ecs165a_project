@@ -1,0 +1,17 @@
+Bufferpool (Carlos + ????):
+- (LRU) policy
+- Pages[size] -- all the slots in the bufferpool
+- ...
+- bufferproo.getRID()
+- bufferproo.getPage()...RID?
+- 
+
+change how Table , etc. works to persist on disk
+# [] = 21j3lj -> write to disk
+
+
+Merge (everyone else)
+
+Index (Lewis)
+- duplicate keys (DONE)
+- make index work with non-key field

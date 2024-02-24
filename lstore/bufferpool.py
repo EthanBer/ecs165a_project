@@ -49,8 +49,8 @@ class Bufferpool:
         self.bufferpool.append(bpage)
 
     
-    def pin_page(self, page: Page):
-        for pg in pages
+    # def pin_page(self, page: Page):
+    #     for pg in pages
         
 
 
@@ -80,6 +80,7 @@ class Bufferpool:
 
     # This function implements the LRU
     def evict_page_LRU(self):
+        pass
         # Remember that it has to be the LRU page that isnt pinned
 
         
