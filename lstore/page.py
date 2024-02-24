@@ -9,7 +9,8 @@ from lstore.helper import helper
 class Page:
     def __init__(self, num_columns: int, key_index : DataIndex):
         self.key_index = key_index
-        # self.id = config.ID_COUNT config.ID_COUNT += 1
+        self.id = config.ID_COUNT 
+        config.ID_COUNT += 1
         self.debugging_id = random.randint(0, 10^6)
 
         self.num_records = 0

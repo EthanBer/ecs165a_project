@@ -2,6 +2,7 @@ from __future__ import annotations
 import time
 import typing
 import os
+from lstore.table import PageDirectoryEntry
 from lstore.ColumnIndex import DataIndex
 from lstore.base_tail_page import BasePage
 from lstore.config import Metadata, config
@@ -46,7 +47,8 @@ class Buffered(Generic[T]):
 		self.contents = contents
 		self.initialized = True
 		# self.contents: T = contents
-	
+
+
 class Bufferpool:
 	# buffered_physical_pages: list[Buffered[PhysicalPage]] = []
 	# page_to_commit: typing.Annotated[list[PhysicalPage], self.num_raw_columns] = []
@@ -54,17 +56,25 @@ class Bufferpool:
 	# buffered_physical_pages: dict[int, Buffered[PhysicalPage]] = {}
 	pin_counts: list[int] = []
 	# TODO: flush catalog information, like last_base_page_id, to disk before closing
-	def __init__(self, tables: list['Table']) -> None: 
+	def __init__(self, path, tables: list[Table]) -> None: 
 		self.pin_counts: Annotated[list[int], config.BUFFERPOOL_SIZE] = [0] * config.BUFFERPOOL_SIZE
 		self.buffered_physical_pages: Annotated[list[PhysicalPage | None], config.BUFFERPOOL_SIZE] = [None] * config.BUFFERPOOL_SIZE
 		self.tables = tables
 		# self.file_handlers = {table.name: FileHandler(table) for table in self.tables} # create FileHandlers for each table
 		# self.table_for_physical_pages: Annotated[list[str | None], config.BUFFERPOOL_SIZE] = [None] * config.BUFFERPOOL_SIZE
 		self.dirty_bits: Annotated[list[bool], config.BUFFERPOOL_SIZE] = [False] * config.BUFFERPOOL_SIZE
-		pass
+		self.ids_of_physical_pages = []
+		self.index_of_physical_page_in_the_page= []
+		self.path = path
+
+
 	def change_pin_count(self, buff_indices: list[int], change: int) -> None:
 		for idx in buff_indices:
 			self.pin_counts[idx] += change
+
+
+
+
 	def insert_record(self, table_name: str, metadata: Metadata, *columns: int) -> int: # returns RID of inserted record
 		table_list = list(filter(lambda table: table.name == table_name, self.tables))
 		assert len(table_list) == 1
@@ -84,6 +94,58 @@ class Bufferpool:
 	
 	"""
 
+
+	def is_record_in_bufferpool(self, table_name : str, record_id : int, projected_columns_index: list[Literal[0] | Literal[1]]): ## this will be called inside the bufferpool functions
+		table = None
+		for curr_table in self.tables:
+			if curr_table.name == table_name:
+				table = curr_table
+		
+		for key in table.page_directory.keys:
+			if key== record_id:
+				page_directory_entry = table.page_directory[key]
+				break 
+		record_page=page_directory_entry.page
+
+
+		number_of_columns = sum(projected_columns_index)
+		num_of_columns_found = 0
+		for i in range(len(self.ids_of_physical_pages)):
+			if (self.ids_of_physical_pages[i] == record_page.id) and (projected_columns_index[i] == 1):
+				num_of_columns_found += 1
+
+		return num_of_columns_found == number_of_columns
+
+	def get_record(self, record: rid):
+		pass
+
+
+	def evict_physcical_page_clock(self) -> None:
+		for i in range(len(self.buffered_physical_pages)):
+			if self.pin_counts[i] == 0:
+				if self.dirty_bits[i]==1: #remove from the buffer without writing in disk
+					self.write_to_disk(i)
+				self.remove_dirty_from_buffer(i)
+
+
+	def remove_dirty_from_buffer(self,index):
+		self.pin_counts.remove(index)
+		self.dirty_bits.remove(index)
+		self.buffered_physical_pages.remove(index)
+		self.ids_of_physical_pages.remove(index)
+		self.index_of_physical_page_in_the_page.remove(index)
+
+
+	def write_to_disk(self, index: int):
+
+		for 
+
+
+
+		with open(self.path + "/", )
+
+
+			
 
 class BufferedValue():
 	def __init__(self, file_handler: FileHandler, page_sub_path: PageID | Literal["catalog"], byte_position: int):

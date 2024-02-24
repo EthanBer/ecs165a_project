@@ -13,7 +13,6 @@ class Database():
     # Not required for milestone1
     
     def open(self, path):
-        self.bpool=Bufferpool()
         #if database is new and there are previous files 
         try:
             os.mkdir(path)
@@ -28,14 +27,14 @@ class Database():
                 newpath = os.path.join(path, table_name)
                 
                 final_path = os.path.join(newpath,"catalog")
-                with open(final_path, 'r') as catalog:
+                with open(final_path, 'rb') as catalog:
                     #get the catalog to create the table 
-                    table_num_columns=catalog.readline()
-                    table_key_index=catalog.readline()
-                    table_pages_per_range=catalog.readline()
-                    table_last_phyisical_page_id=catalog.readline()
-                    table_last_tail_id=catalog.readline()
-                    table_last_rid=catalog.readline() 
+                    table_num_columns= int.from_bytes(catalog.readline())
+                    table_key_index= int.from_bytes(catalog.readline())
+                    table_pages_per_range = int.from_bytes(catalog.readline())
+                    table_last_page_id = int.from_bytes(catalog.readline())
+                    table_last_tail_id= int.from_bytes(catalog.readline())
+                    table_last_rid= int.from_bytes(catalog.readline())
 
                 final_path=os.path.join(newpath,"page_directory")
                 with open(final_path, "rb") as page_directory:
@@ -91,8 +90,9 @@ class Database():
                             list_page_ranges[-1].base_pages.append(page)
                         elif file == "tail_page*":
                             list_page_ranges[-1].tail_pages.append(page)
-                        num_page += 1       
-
+                        num_page += 1
+             
+        self.bpool=Bufferpool(path, self.tables)
 
 
     def close(self):
