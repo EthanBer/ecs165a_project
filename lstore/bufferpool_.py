@@ -1,3 +1,5 @@
+from __future__ import annotations
+import time
 import typing
 import os
 from lstore.ColumnIndex import DataIndex
@@ -7,7 +9,6 @@ from lstore.helper import helper
 from lstore.page import Page
 from lstore.record_physical_page import PhysicalPage, Record
 from typing import Literal, TypeVar, Generic, Annotated
-from __future__ import annotations
 
 from lstore.table import Table
 
@@ -53,19 +54,22 @@ class Bufferpool:
 	# buffered_physical_pages: dict[int, Buffered[PhysicalPage]] = {}
 	pin_counts: list[int] = []
 	# TODO: flush catalog information, like last_base_page_id, to disk before closing
-	def __init__(self, tables: list[Table]) -> None: 
+	def __init__(self, tables: list['Table']) -> None: 
 		self.pin_counts: Annotated[list[int], config.BUFFERPOOL_SIZE] = [0] * config.BUFFERPOOL_SIZE
 		self.buffered_physical_pages: Annotated[list[PhysicalPage | None], config.BUFFERPOOL_SIZE] = [None] * config.BUFFERPOOL_SIZE
 		self.tables = tables
-		self.file_handlers = {table.name: FileHandler(table) for table in self.tables} # create FileHandlers for each table
-		self.table_for_physical_pages: Annotated[list[str | None], config.BUFFERPOOL_SIZE] = [None] * config.BUFFERPOOL_SIZE
+		# self.file_handlers = {table.name: FileHandler(table) for table in self.tables} # create FileHandlers for each table
+		# self.table_for_physical_pages: Annotated[list[str | None], config.BUFFERPOOL_SIZE] = [None] * config.BUFFERPOOL_SIZE
 		self.dirty_bits: Annotated[list[bool], config.BUFFERPOOL_SIZE] = [False] * config.BUFFERPOOL_SIZE
 		pass
 	def change_pin_count(self, buff_indices: list[int], change: int) -> None:
 		for idx in buff_indices:
 			self.pin_counts[idx] += change
 	def insert_record(self, table_name: str, metadata: Metadata, *columns: int) -> int: # returns RID of inserted record
-		self.file_handlers[table_name].insert_record(metadata, columns)
+		table_list = list(filter(lambda table: table.name == table_name, self.tables))
+		assert len(table_list) == 1
+		table = table_list[0]
+		return table.file_handler.insert_record(metadata, *columns)
 
 
 		# if full:
@@ -103,11 +107,12 @@ class BufferedValue():
 		self.flush()
 	
 class FileHandler:
-	def __init__(self, table: Table) -> None:
+	def __init__(self, table: 'Table') -> None:
 		# self.last_base_page_id = self.get_last_base_page_id()
 		self.last_base_page_id = BufferedValue(self, "catalog", config.byte_position.CATALOG_LAST_BASE_ID)
 		self.last_tail_page_id = BufferedValue(self, "catalog", config.byte_position.CATALOG_LAST_TAIL_ID)
 		self.last_metadata_page_id = BufferedValue(self, "catalog", config.byte_position.CATALOG_LAST_METADATA_ID)
+		self.last_rid = BufferedValue(self, "catalog", config.byte_position.CATALOG_LAST_RID)
 		# TODO: populate the offset byte with 0 when creating a new page
 		self.offset = BufferedValue(self, BasePageID(self.last_base_page_id.value() - 1), config.byte_position.BASE_OFFSET) # the current offset is based on the last written page
 		self.table = table
@@ -150,13 +155,13 @@ class FileHandler:
 
 	@staticmethod
 	def write_position(page_path: str, byte_position: int, value: int) -> bool:
-		with open(page_path, "w") as file:
+		with open(page_path, "wb") as file:
 			file.seek(byte_position)
-			file.write(str(value))
+			file.write(value.to_bytes(config.BYTES_PER_INT, byteorder="big"))
 		return True
 
-	def write_new_base_page(self, physical_pages: list[PhysicalPage], base_page_id: int) -> bool: # the page MUST be full in order to write. returns true if success
-		bpath = self.base_path(base_page_id)
+	def write_new_base_page(self, physical_pages: list[PhysicalPage]) -> bool: # the page MUST be full in order to write. returns true if success
+		bpath = self.base_path(self.last_base_page_id.value(1))
 
 		# check that physical page sizes and offsets are the same
 		assert len(
@@ -168,9 +173,11 @@ class FileHandler:
 
 		with open(bpath, "wb") as file:
 			file.write(metadata_pointer.to_bytes(config.BYTES_PER_INT, byteorder="big"))
-			file.write((16).to_bytes(8, byteorder="big"))
+			file.write((16).to_bytes(8, byteorder="big")) # offset 16 is the first byte offset where data can go
 			for physical_page in physical_pages:
 				file.write(physical_page.data)
+		# self.page_to_commit.clear()
+		self.page_to_commit = self.read_base_page(self.last_base_page_id.value())
 		return True
 
 	def read_base_page(self, base_page_id: int) -> list[PhysicalPage]: # reads the full base page written to disk
@@ -180,7 +187,7 @@ class FileHandler:
 				physical_pages.append(PhysicalPage(data=bytearray(file.read(config.PHYSICAL_PAGE_SIZE)), offset=config.PHYSICAL_PAGE_SIZE))
 		return physical_pages
 
-	def insert_record(self, metadata: Metadata, *columns: int) -> bool:
+	def insert_record(self, metadata: Metadata, *columns: int | None) -> int: # returns RID of inserted record
 		null_bitmask = 0
 		total_cols = self.table.total_columns
 		if metadata.indirection_column == None: # set 1 for null indirection column
@@ -199,18 +206,19 @@ class FileHandler:
 		# Transform columns to a list to append the schema encoding and the indirection column
 		# print(columns)
 		list_columns: list[int | None] = list(columns)
+		rid = self.last_rid.value(1)
 		list_columns.insert(config.INDIRECTION_COLUMN, metadata.indirection_column)
-		list_columns.insert(config.RID_COLUMN, metadata.rid)
-		list_columns.insert(config.TIMESTAMP_COLUMN, metadata.timestamp)
+		list_columns.insert(config.RID_COLUMN, rid)
+		list_columns.insert(config.TIMESTAMP_COLUMN, int(time.time()))
 		list_columns.insert(config.SCHEMA_ENCODING_COLUMN, metadata.schema_encoding)
 		list_columns.insert(config.NULL_COLUMN, null_bitmask)
 		cols = tuple(list_columns)
 		for i in range(len(self.page_to_commit)):
 			self.page_to_commit[i].insert(cols[i])
 			self.offset.value(config.BYTES_PER_INT)
-		if self.offset == config.PHYSICAL_PAGE_SIZE:
-			self.write_new_base_page(self.page_to_commit, self.last_base_page_id.value(1))	
-		return True
+		if self.offset.value() == config.PHYSICAL_PAGE_SIZE:
+			self.write_new_base_page(self.page_to_commit)	
+		return rid
 
 	
 

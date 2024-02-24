@@ -31,15 +31,15 @@ class config:
 
 	BYTES_PER_INT = 8	
 
-
-
-
-
-class Metadata:
-	def __init__(self, indirection_column: int | None, rid: int, timestamp: int, schema_encoding: int, null_column: int | None):
-		self.indirection_column = indirection_column
+class PhysicalMetadata:
+	def __init__(self, rid: int, timestamp: int):
 		self.rid = rid
 		self.timestamp = timestamp
+class Metadata:
+	def __init__(self, indirection_column: int | None, schema_encoding: int, null_column: int | None):
+		# self.rid = rid
+		# self.timestamp = timestamp
+		self.indirection_column = indirection_column
 		self.schema_encoding = schema_encoding
 		self.null_column = null_column
 

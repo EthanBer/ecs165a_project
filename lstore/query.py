@@ -117,28 +117,27 @@ class Query:
         schema_encoding = 0b0
         timestamp = int(time.time())
 
-        page: BasePage | None = None
-        page_range: PageRange | None = None
-        if not self.table.page_ranges[-1].base_pages[-1].has_capacity():  # the last page of the page range is full
-            if not self.table.page_ranges[
-                -1].has_capacity():  # the page range can't handle another page, so make a new range. this range implicitly makes a new page as well
-                self.table.page_ranges.append(
-                    PageRange(self.table.num_columns, self.table.key_index, self.table.pages_per_range))
-            else:  # the last page of the range was full, but the page range can accomodate another page, so make one
-                page = BasePage(self.table.num_columns, self.table.key_index)
-                page_range = self.table.page_ranges[-1]
-                self.table.page_ranges[-1].base_pages.append(page)
-        page = self.table.page_ranges[-1].base_pages[-1]
-        page_range = self.table.page_ranges[-1]
+        # page: BasePage | None = None
+        # page_range: PageRange | None = None
+        # if not self.table.page_ranges[-1].base_pages[-1].has_capacity():  # the last page of the page range is full
+        #     if not self.table.page_ranges[
+        #         -1].has_capacity():  # the page range can't handle another page, so make a new range. this range implicitly makes a new page as well
+        #         self.table.page_ranges.append(
+        #             PageRange(self.table.num_columns, self.table.key_index, self.table.pages_per_range))
+        #     else:  # the last page of the range was full, but the page range can accomodate another page, so make one
+        #         page = BasePage(self.table.num_columns, self.table.key_index)
+        #         page_range = self.table.page_ranges[-1]
+        #         self.table.page_ranges[-1].base_pages.append(page)
+        # page = self.table.page_ranges[-1].base_pages[-1]
+        # page_range = self.table.page_ranges[-1]
 
-        if page is None or page_range is None:
-            return False
+        # if page is None or page_range is None:
+        #     return False
 
         # the null column in this Metadata object won't be used by the page insert.
         # print(f"trying to insert")
         # print(f"trying to insert {columns}")
-        rid = self.table.page_ranges[-1].base_pages[-1].insert(
-            Metadata(None, self.table.last_rid, timestamp, schema_encoding, None), *columns)
+        rid = self.table.file_handler.insert_record(Metadata(None, 0b0, None), *columns)
         # print(f"rid: {rid}")
 
         # if rid == -1:

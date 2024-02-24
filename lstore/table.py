@@ -1,5 +1,6 @@
 from time import time
 from typing import TypedDict
+from lstore.bufferpool_ import FileHandler
 from lstore.helper import helper
 from lstore.base_tail_page import BasePage
 from lstore.config import config
@@ -42,13 +43,14 @@ class Table:
         self.num_columns: int = num_columns # data columns only
         self.total_columns = self.num_columns + config.NUM_METADATA_COL # inclding metadata
         self.page_directory: dict[int, PageDirectoryEntry] = {}
-        self.last_rid = 1
+        self.file_handler = FileHandler(self)
+        # self.last_rid = 1
         self.pages_per_range = pages_per_range
 
-        ## second milestone
-        self.last_physical_page_id=None
-        self.last_tail_id=None  
-        ####
+        # ## second milestone
+        # self.last_physical_page_id=None
+        # self.last_tail_id=None  
+        # ####
         
         
         # Page Directory:
