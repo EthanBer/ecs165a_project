@@ -44,6 +44,13 @@ class Table:
         self.page_directory: dict[int, PageDirectoryEntry] = {}
         self.last_rid = 1
         self.pages_per_range = pages_per_range
+
+        ## second milestone
+        self.last_physical_page_id=None
+        self.last_tail_id=None  
+        ####
+        
+        
         # Page Directory:
         # {Rid: (Page, offset)}
         from lstore.index import Index
