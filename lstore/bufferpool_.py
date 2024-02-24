@@ -63,8 +63,8 @@ class Bufferpool:
 		# self.file_handlers = {table.name: FileHandler(table) for table in self.tables} # create FileHandlers for each table
 		# self.table_for_physical_pages: Annotated[list[str | None], config.BUFFERPOOL_SIZE] = [None] * config.BUFFERPOOL_SIZE
 		self.dirty_bits: Annotated[list[bool], config.BUFFERPOOL_SIZE] = [False] * config.BUFFERPOOL_SIZE
-		self.ids_of_physical_pages = []
-		self.index_of_physical_page_in_the_page= []
+		self.ids_of_physical_pages : list[int] = []
+		self.index_of_physical_page_in_the_page : list[int] = [] # This tells you if its the first, second, third, etc physical page of the page
 		self.path = path
 
 
@@ -120,12 +120,14 @@ class Bufferpool:
 		pass
 
 
-	def evict_physcical_page_clock(self) -> None:
+	def evict_physcical_page_clock(self) -> bool:
 		for i in range(len(self.buffered_physical_pages)):
 			if self.pin_counts[i] == 0:
 				if self.dirty_bits[i]==1: #remove from the buffer without writing in disk
 					self.write_to_disk(i)
 				self.remove_dirty_from_buffer(i)
+				return True
+		return False
 
 
 	def remove_dirty_from_buffer(self,index):
@@ -137,12 +139,11 @@ class Bufferpool:
 
 
 	def write_to_disk(self, index: int):
-
-		for 
-
-
-
-		with open(self.path + "/", )
+		path = os.path.join(self.path, FileHandler.base_path(self.ids_of_physical_pages[index]))
+		with open(path, 'wb') as file:
+			file.seek(self.index_of_physical_page_in_the_page[index] * config.PHYSICAL_PAGE_SIZE)
+			if self.buffered_physical_pages[index] != None:
+				file.write(self.buffered_physical_pages[index].data)
 
 
 			
