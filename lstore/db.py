@@ -4,15 +4,18 @@ from lstore.table import Table
 import os
 from  lstore.bufferpool import Bufferpool 
 from lstore.page import Page, PhysicalPage
+from lstore.page_range import PageRange
 class Database():
 
     def __init__(self) -> None:
         self.tables: list[Table] = []
+        self.path=None 
         pass
 
     # Not required for milestone1
     
     def open(self, path):
+        self.path=path
         #if database is new and there are previous files 
         try:
             os.mkdir(path)
@@ -48,6 +51,8 @@ class Database():
                 list_tail_page =[]
                 list_page_ranges = []
                 new_page_range=PageRange(table_num_columns, table_key_index, table_pages_per_range)
+                new_page_range.path=path 
+                new_page_range.table_name=table_name
                 new_page_range.base_pages=[]
                 new_page_range.tail_pages=[]
                 list_page_ranges.append(new_page_range)
@@ -55,7 +60,7 @@ class Database():
                 
                 for file in os.listdir(newpath):
                     if file == "*page*":
-                        page_id=int(file.split("$")[1]) # take the page id, may not work :( 
+                        page_id=int(file.split("_")[1]) # take the page id, may not work :( 
                         page=Page(table_num_columns,table_key_index)
                         page.id=page_id 
 
@@ -79,7 +84,7 @@ class Database():
                             page.physical_pages=list_physical_pages
                             list_base_pages.append(page)
                         
-                        if num_page >= table_pages_per_range:
+                        if not new_page_range.has_capacity():
                             num_page = 0
                             new_page_range = PageRange(table_num_columns, table_key_index, table_pages_per_range)
                             new_page_range.base_pages=[]
@@ -96,6 +101,11 @@ class Database():
 
 
     def close(self):
+        self.bpool.close_bufferpool()
+        self.tables.clear()
+
+
+        
         
         
     """
