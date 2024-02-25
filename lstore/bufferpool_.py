@@ -370,44 +370,24 @@ class Bufferpool:
 		# 	self.buffered_metadata.append(list_metadata)
 
 
-	# THIS FUNCTION RECEIVES ONLY BASE RECORDS 
+	# THIS FUNCTION RECEIVES ONLY **BASE** RECORDS
 	def get_updated_record(self, table_name: str, record_id: int, projected_columns_index: list[Literal[0] | Literal[1]]) -> Record | None:
 
 		# If there are multiple writers we probably need a lock here so the indirection column is not modified after we get it
 		buffered_record = self.get_record(table_name, record_id, projected_columns_index)
 		record = buffered_record.get_value()
 		indirection_column = record.metadata.indirection_column
-
-		"""
-		# Check if we already got the most updated record (if indirection column is null)
-		# Check that I did this operation properly
-		if (record.metdata.null_column & 1 << (len(projected_columns_index) + config.NUM_METADATA_COL -2)) == 0:
-			last_record = self.get_record(table_name, indirection_column, projected_columns_index)
-		else:
-			last_record = record
-		"""
-		updated_columns = []
+		updated_columns = [None]* len(projected_columns_index)
 		last_record = record
 		for i in range(len(projected_columns_index)):
-			if projected_columns_index[i] == 1:
-				if (record.metadata.schema_encoding & 1 << (len(projected_columns_index) + config.NUM_METADATA_COL - i)) == 0:
-					updated_columns.append(record.columns[i])
-				else:
+			if projected_columns_index[i] == 1: 
+				while (last_record.metadata.schema_encoding & 1 << (len(projected_columns_index) + config.NUM_METADATA_COL - i))!=0: #go back in case it was updated previously
 					last_record = self.get_record(table_name, indirection_column, projected_columns_index)
-					
-
-					
-
-
-		updated_columns = 0
-		for i in range(len(projected_columns_index)):
-			if projected_columns_index[i] == 1:
-				if last_record.columns[i] != None:
-					updated_columns+=1
-					if updated_columns==sum(projected_columns_index):
-						break
-				else:
-
+				updated_columns[i]=last_record.columns[i]
+		updated_record=Record(record.metadata, updated_columns)
+		return updated_record
+	
+				
 				
 
 			
