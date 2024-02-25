@@ -91,7 +91,7 @@ class Query:
             # return False
 
         page_directory_entry = PageDirectoryEntry(page_range, tail_page, tail_page.num_records - 1)
-        self.table.page_directory[rid] = page_directory_entry
+        self.table.page_directory_buff[rid] = page_directory_entry
         self.table.last_rid += 1
         return rid
 
@@ -137,7 +137,7 @@ class Query:
         # the null column in this Metadata object won't be used by the page insert.
         # print(f"trying to insert")
         # print(f"trying to insert {columns}")
-        rid = self.table.file_handler.insert_record(Metadata(None, 0b0, None), *columns)
+        page_directory_entry = self.table.file_handler.insert_record(Metadata(None, 0b0, None), *columns)
         # print(f"rid: {rid}")
 
         # if rid == -1:
@@ -147,8 +147,7 @@ class Query:
         if rid == -1:
             raise (Exception("insert failed"))
 
-        page_directory_entry = PageDirectoryEntry(page_range, page, page.num_records - 1)
-        self.table.page_directory[rid] = page_directory_entry
+        self.table.page_directory_buff[rid] = page_directory_entry
         self.table.last_rid += 1
 
         self.table.index.update_index(self.table.key_index,
@@ -392,7 +391,7 @@ class Query:
         # assert len(primary_key_matches) == 1 # primary key results in ONE select result
         # select indirection and rid columns
         base_record = primary_key_matches[0]
-        base_page_dir_entry = self.table.page_directory[base_record.rid]
+        base_page_dir_entry = self.table.page_directory_buff[base_record.rid]
         page_range = base_page_dir_entry.page_range
         # self.insert_tail(tail_page, )
 
@@ -464,8 +463,8 @@ class Query:
 
             if tmp_indirection_col is not None:
                 while True:
-                    base_dir_entry = self.table.page_directory[tmp_indirection_col]
-                    page = base_dir_entry.page
+                    base_dir_entry = self.table.page_directory_buff[tmp_indirection_col]
+                    page = base_dir_entry.page_id
                     offset = base_dir_entry.offset
 
                     # packed_data = struct.pack(config.PACKING_FORMAT_STR, bitmask)
@@ -479,16 +478,16 @@ class Query:
                     tmp_indirection_col = helper.unpack_col(page, config.INDIRECTION_COLUMN, offset)
                     # tmp_indirection_col = struct.unpack(config.PACKING_FORMAT_STR, page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]
             else:
-                base_dir_entry = self.table.page_directory[base_record.rid]
-                base_dir_entry.page.update_nth_record(base_dir_entry.offset, config.NULL_COLUMN, bitmask)
+                base_dir_entry = self.table.page_directory_buff[base_record.rid]
+                base_dir_entry.page_id.update_nth_record(base_dir_entry.offset, config.NULL_COLUMN, bitmask)
 
         base_indirection = self.insert_tail(page_range, tail_indirection, tail_schema_encoding, *updated_columns)
 
-        success = base_page_dir_entry.page.update_nth_record(base_page_dir_entry.offset, config.INDIRECTION_COLUMN,
+        success = base_page_dir_entry.page_id.update_nth_record(base_page_dir_entry.offset, config.INDIRECTION_COLUMN,
                                                              base_indirection)
         assert success, "update not successful"
         base_schema_encoding = base_record.schema_encoding | tail_schema_encoding
-        success = base_page_dir_entry.page.update_nth_record(base_page_dir_entry.offset, config.SCHEMA_ENCODING_COLUMN,
+        success = base_page_dir_entry.page_id.update_nth_record(base_page_dir_entry.offset, config.SCHEMA_ENCODING_COLUMN,
                                                              base_schema_encoding)
         assert success, "update not successful"
         return success
