@@ -5,7 +5,7 @@ from lstore.index import Index
 from lstore.page import Page
 from lstore.base_tail_page import BasePage, TailPage
 import time
-from lstore.config import Metadata, config
+from lstore.config import WriteSpecifiedMetadata, config
 from lstore.helper import helper
 import struct
 from lstore.page_range import PageRange
@@ -84,7 +84,7 @@ class Query:
             self.table.key_index.toRawIndex())  # this value for the null column makes the key column null
 
         rid = tail_page.insert(
-            Metadata(indirection_column, self.table.last_rid, timestamp, schema_encoding, key_null_bitmask), *columns)
+            WriteSpecifiedMetadata(indirection_column, self.table.last_rid, timestamp, schema_encoding, key_null_bitmask), *columns)
 
         if rid == -1:
             raise (Exception("insert tail failed"))
@@ -137,7 +137,7 @@ class Query:
         # the null column in this Metadata object won't be used by the page insert.
         # print(f"trying to insert")
         # print(f"trying to insert {columns}")
-        page_directory_entry = self.table.file_handler.insert_record(Metadata(None, 0b0, None), *columns)
+        page_directory_entry = self.table.file_handler.insert_record(WriteSpecifiedMetadata(None, 0b0, None), *columns)
         # print(f"rid: {rid}")
 
         # if rid == -1:

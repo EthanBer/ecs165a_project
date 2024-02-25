@@ -30,11 +30,14 @@ class config:
 
 	BYTES_PER_INT = 8	
 
-class PhysicalMetadata:
-	def __init__(self, rid: int, timestamp: int):
+class FullMetadata:
+	def __init__(self, rid: int | None, timestamp: int, indirection_column: int | None, schema_encoding: int, null_column: int | None):
 		self.rid = rid
 		self.timestamp = timestamp
-class Metadata:
+		self.indirection_column = indirection_column
+		self.schema_encoding = schema_encoding
+		self.null_column = null_column
+class WriteSpecifiedMetadata:
 	def __init__(self, indirection_column: int | None, schema_encoding: int, null_column: int | None):
 		# self.rid = rid
 		# self.timestamp = timestamp

@@ -1,11 +1,11 @@
 import struct
 from typing import Annotated
-from lstore.config import Metadata, config
+from lstore.config import WriteSpecifiedMetadata, config
 from lstore.helper import helper
 
 
 class Record:
-    def __init__(self, metadata: Metadata, base_record: bool, *columns : int | None):
+    def __init__(self, metadata: WriteSpecifiedMetadata, base_record: bool, *columns : int | None):
         # self.indirection_column = metadata.indirection_column
         # self.timestamp = metadata.timestamp
         # self.rid = metadata.rid
@@ -22,7 +22,7 @@ class Record:
 
 
 class BaseRecord(Record):
-    def __init__(self, metadata: Metadata, key: int, *columns: int | None):
+    def __init__(self, metadata: WriteSpecifiedMetadata, key: int, *columns: int | None):
         super().__init__(metadata, *columns)
         self.key = key
     # def __str__(self) -> str:

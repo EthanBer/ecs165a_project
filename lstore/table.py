@@ -1,6 +1,6 @@
 from time import time
-from typing import TypedDict
-from lstore.bufferpool_ import BufferedDictValue, BufferedValue, FileHandler, MetadataPageID, PageID
+from typing import Literal, TypedDict
+from lstore.bufferpool_ import PseudoBuffDictValue, BufferedValue, FileHandler, MetadataPageID, PageID
 from lstore.helper import helper
 from lstore.base_tail_page import BasePage
 from lstore.config import config
@@ -17,10 +17,11 @@ SCHEMA_ENCODING_COLUMN = 2
 
 
 class PageDirectoryEntry:
-    def __init__(self, page_id: PageID, metadata_page_id: MetadataPageID, offset: int):
+    def __init__(self, page_id: PageID, metadata_page_id: MetadataPageID, offset: int, page_type: Literal["base", "tail"]):
         self.page_id = page_id
         self.metadata_page_id = metadata_page_id
         self.offset = offset
+        self.page_type = page_type
 
     # @property
     # def high_level_str(self) -> str:
@@ -43,7 +44,7 @@ class Table:
         self.num_columns: int = num_columns # data columns only
         self.total_columns = self.num_columns + config.NUM_METADATA_COL # inclding metadata
         self.file_handler = FileHandler(self)
-        self.page_directory_buff = BufferedDictValue[int, PageDirectoryEntry](self.file_handler, "page_directory")
+        self.page_directory_buff = PseudoBuffDictValue[int, PageDirectoryEntry](self.file_handler, "page_directory")
         # self.last_rid = 1
         self.pages_per_range = pages_per_range
 

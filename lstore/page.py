@@ -2,7 +2,7 @@ import random
 import struct
 from lstore.record_physical_page import Record, PhysicalPage
 from lstore.ColumnIndex import DataIndex, RawIndex
-from lstore.config import config, Metadata
+from lstore.config import config, WriteSpecifiedMetadata
 from lstore.helper import helper
 
 
@@ -53,7 +53,7 @@ class Page:
 
 
     # Returns -1 if there is no capacity in the page
-    def insert(self, metadata: Metadata, *columns: int | None) -> int:
+    def insert(self, metadata: WriteSpecifiedMetadata, *columns: int | None) -> int:
         # NOTE: should follow same format as records, should return RID of successful record
 
         null_bitmask = 0
@@ -134,7 +134,7 @@ class Page:
             columns.append(self.physical_pages[i].__get_nth_record__(record_idx))
         
         from lstore.base_tail_page import BasePage
-        return Record(Metadata(indirection_column, rid, timestamp, schema_encoding, null_col), key_col, isinstance(self, BasePage), *columns)
+        return Record(WriteSpecifiedMetadata(indirection_column, rid, timestamp, schema_encoding, null_col), key_col, isinstance(self, BasePage), *columns)
 
     def update_nth_record(self, record_idx: int, update_col_idx: RawIndex, new_val: int) -> bool:
         self.physical_pages[update_col_idx].data[(record_idx * 8):(record_idx * 8)+8] = struct.pack(config.PACKING_FORMAT_STR, new_val)
