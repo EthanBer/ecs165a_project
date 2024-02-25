@@ -33,7 +33,7 @@ class BufferpoolIndex(int):
 
 class BufferedRecord:
 	def __del__(self) -> None:
-		self.bufferpool.change_pin_count(self.buff_indices, -1)
+		self.bufferpool.change_pin_count(self.base_buff_indices, -1)
 	def __getattribute__(self, attr: str): # type: ignore[no-untyped-def]
 		if attr == "_contents":
 			raise(Exception("do NOT get the contents directly"))
@@ -43,17 +43,53 @@ class BufferedRecord:
 		if name == "_contents" and self.initialized:
 			raise(Exception("buffered copies are read only"))
 		super().__setattr__(name, value)
-	def __init__(self, bufferpool: 'Bufferpool', buff_indices: List[int], table_name: str, record_offset: int, contents: T, record_id: int, projected_columns_index: List[Literal[0, 1]]):
+	def __init__(self, bufferpool: 'Bufferpool', base_buff_indices: List[BufferpoolIndex], tail_buff_indices: List[BufferpoolIndex], table_name: str, record_offset: int, contents: T, record_id: int, projected_columns_index: List[Literal[0, 1]]):
 		self.initialized = False
 		self.bufferpool = bufferpool
-		self.bufferpool.change_pin_count(buff_indices, +1)
-		self.buff_indices = buff_indices
+		self.bufferpool.change_pin_count(base_buff_indices, +1) # increment pin counts of relevant bufferpool frames
+		self.base_buff_indices = base_buff_indices # frame indices of base pages (including metadata and data)
+		self.tail_buff_indices = tail_buff_indices # frame indices of tail pages (including metadata and data)
 		self._contents = contents
 		self.table: Table = next(table for table in self.bufferpool.tables if table.name == table_name)
 		self.record_offset = record_offset
 		self.record_id = record_id
 		self.projected_columns_index = projected_columns_index
 		self.initialized = True
+	def add_base_buff_idx(self, base_buff_idx: BufferpoolIndex):
+		self.base_buff_indices.append(base_buff_idx)
+		self.bufferpool.pin_counts[base_buff_idx] += 1 # will be decremented later because it was addded to base_buff_indices
+
+	def add_tail_buff_idx(self, tail_buff_idx: BufferpoolIndex):
+		self.base_buff_indices.append(tail_buff_idx)
+		self.bufferpool.pin_counts[tail_buff_idx] += 1 # will be decremented later because it was addded to base_buff_indices
+
+	# TODO: def get_value(self, version: int = 0): 
+		# all versions of this record should be pinned in bufferpool (ie included in buff_indices)
+			# when an update happens relevant to this record, the relevant buff_idx for the tail page is added to 
+			# tail_buff_indices, if it isn't already there. the pin count for that tail page should also be incremented by 1 (ONLY that tail page!)
+			# tail_rid[] array maintained for every tail_buff_indices 
+		# call self.bufferpool.get_record(...) repeatedly to get relevant tail pages.
+			# as you get them, pin those tail pages and add them to self.tail_buff_indices
+			# once you find the version you're looking for, stop.
+
+
+		# if tail pages are pinned, we should keep track of their versions here. every time an update happens on this record, the versions decrease by 1.
+			# versions[] array for each pinned tail page.
+		# if the selected version is present in bufferpool for all projected_columns, 
+		# if the selected version is in bufferpool, get that tail page, apply that update to base page, and return
+
+		# for column in self.projected_columns:
+			# if bufferpool(self.tail_indices) has tail page with column_idx == column and version in versions[], 
+				# apply that update to base record
+			# else,
+				# get tail page that contains 
+
+
+		# the buff_indices should include all tail records relevant to this record, because maybe someone wants a priorprior version.?
+			# or only pin the pages that have the updates for the version we want (e.g. latest tail page)?
+			# if we have the requested version in the bufferpool (not evicted because this class incremented the pin count), 
+				# use that tail page to get 
+		# calls self.bufferpool.get_record(...) repeatedly
 
 	# TODO: remove the type ignore comment
 	def value(self) -> Record: # type: ignore[return]
@@ -136,6 +172,7 @@ class Bufferpool:
 		self.index_of_physical_page_in_the_page : list[RawIndex | None] = [None] * config.BUFFERPOOL_SIZE # This tells you if its the first, second, third, etc physical page of the page
 		self.page_types: Annotated[list[Literal["base", "tail", "metadata"] | None], config.BUFFERPOOL_SIZE] = [None] * config.BUFFERPOOL_SIZE
 		self.table_names: Annotated[List[str | None], config.BUFFERPOOL_SIZE] = [None] * config.BUFFERPOOL_SIZE
+		self.client_records: List[BufferedRecord] = [] # a list of all BufferedRecords provided by this class to clients
 		self.tables = tables
 		self.path = path
 		self.curr_clock_hand = 0
@@ -332,8 +369,9 @@ class Bufferpool:
 		# 	self.buffered_metadata.append(list_metadata)
 
 
-	# TODO: remove
-	# TODO: get updated value with schema encoding
+	# TODO: remove type ignore
+	# TODO: get updated value with schema encoding (maybe not this function)
+	# TODO: specialize for tail records to only put the non-null columns in bufferpool
 	def get_record(self, table_name: str, record_id: int, projected_columns_index: list[Literal[0] | Literal[1]]) -> Record | None: # type: ignore[return]
 		table: Table = next(table for table in self.tables if table.name == table_name)
 		requested_columns: list[int] = [i for i, binary_item in enumerate(projected_columns_index) if binary_item == 1]
@@ -353,6 +391,11 @@ class Bufferpool:
 			# find all indices not found. evict that many slots, and save the indices. 
 			# also save the data and metadata indices that need retreival
 			# 
+
+
+		# the main difference here is that a certain column MAY be requested, 
+		# but all columns of metadata are requested.
+		# as a reminder, -1 for a buff_idx here means not found, None means not requested.
 		for j, buff_idx in enumerate(data_buff_indices):
 			if buff_idx == -1:
 				data_cols_to_get.append(DataIndex(j))
@@ -360,6 +403,7 @@ class Bufferpool:
 				data_physical_pages.append(None)
 			elif isinstance(buff_idx, BufferpoolIndex):
 				data_physical_pages.append(self.buffered_physical_pages[buff_idx])
+				self.pin_counts[buff_idx] += 1 
 			else:
 				raise(Exception("unexpected datatype for buff_idx inside the is_record_in_bufferpool output"))
 
@@ -370,16 +414,19 @@ class Bufferpool:
 				physical_page = self.buffered_physical_pages[buff_idx]
 				assert physical_page is not None
 				metadata_physical_pages.append(physical_page)
+				self.pin_counts[buff_idx] += 1 
 
-		# a key line:
-		# evict just enough to get the remaining columns, but don't evict what we already have.
 
-		buff_filtered: List[BufferpoolIndex] = [idx for idx in data_buff_indices + metadata_buff_indices if ((idx != -1) and (idx is not None) and (isinstance(idx, BufferpoolIndex)))]
+		# buff_filtered: List[BufferpoolIndex] = [idx for idx in data_buff_indices + metadata_buff_indices if ((idx != -1) and (idx is not None) and (isinstance(idx, BufferpoolIndex)))]
 		# for idx in data_buff_indices + metadata_buff_indices:
 		# 	if (not idx == -1) and (idx is not None):
 		# 		if isinstance(idx, BufferpoolIndex):
 		# 			buff_filtered.append(idx)
-		evicted_buff_idx: List[BufferpoolIndex] | None = self.evict_n_slots(len(metadata_cols_to_get + data_cols_to_get), buff_filtered)
+
+		# a key line:
+		# evict just enough to get the remaining columns, but don't evict what we already have.
+		# "what we already have" has been pinned
+		evicted_buff_idx: List[BufferpoolIndex] | None = self.evict_n_slots(len(metadata_cols_to_get + data_cols_to_get))
 		if evicted_buff_idx == None:
 			return None
 
@@ -389,11 +436,11 @@ class Bufferpool:
 		page_directory_entry = table.page_directory_buff[record_id]
 
 		# NOTE: this is the new proj_cols, to get only whatever we don't have already
-		proj_metadata_cols = [0] * config.NUM_METADATA_COL 
+		proj_metadata_cols: List[Literal[0, 1]] = [0] * config.NUM_METADATA_COL 
 		for i in range(len(metadata_cols_to_get)):
 			proj_metadata_cols[metadata_cols_to_get[i]] = 1
 
-		proj_data_cols = [0] * config.NUM_METADATA_COL
+		proj_data_cols: List[Literal[0, 1]] = [0] * config.NUM_METADATA_COL
 		for i in range(len(data_cols_to_get)):
 			proj_data_cols[data_cols_to_get[i]] = 1
 
@@ -451,6 +498,7 @@ class Bufferpool:
 			self.curr_clock_hand += 1
 		return None
 
+	# NOTE: just pin the indices you want to keep rather than populating the save array... 
 	def evict_n_slots(self, n: int, save: List[BufferpoolIndex] = []) -> List[BufferpoolIndex] | None: # returns buffer indices freed, or None if not all slots could be evicted
 		evicted_buff_idx: list[BufferpoolIndex] = []
 		for _ in range(n):
