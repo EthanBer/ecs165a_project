@@ -40,3 +40,10 @@ class helper:
 		# for el in arr:
 		# 	s += el.__str__()
 		# return s
+
+	# helper function to type cast list 
+	# https://www.geeksforgeeks.org/python-type-casting-whole-list-and-matrix/
+	@staticmethod
+	def cast_list(test_list, data_type):
+		return list(map(data_type, test_list))
+     
