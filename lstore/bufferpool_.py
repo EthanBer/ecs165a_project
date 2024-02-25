@@ -178,6 +178,21 @@ class Bufferpool:
 		self.path = path
 		self.curr_clock_hand = 0
 
+	def close_bufferpool(self):
+		for i in range(len(self.buffered_physical_pages)):
+			if self.dirty_bits[i]==True:
+				self.write_to_disk(i)
+			self.buffered_physical_pages[i]=None
+			self.dirty_bits[i]
+			bufferpool_entry=BufferpoolEntry(0, None, False,  None,  None,  None,  None)
+			self.change_bufferpool_entry(bufferpool_entry,BufferpoolIndex(i))
+		
+		
+
+
+
+
+
 	def change_bufferpool_entry(self, entry: BufferpoolEntry, buff_idx: BufferpoolIndex) -> None:
 		self.pin_counts[buff_idx] = entry.pin_count
 		self.buffered_physical_pages[buff_idx] = entry.physical_page
@@ -295,6 +310,7 @@ class Bufferpool:
 			if idx == -1:
 				self.evict_physical_page_clock()
 
+		
 		# for i, binary_item in enumerate(projected_columns_index):
 		# 	if binary_item == 1:
 		# 		requested_columns.append(i)
@@ -302,6 +318,7 @@ class Bufferpool:
 		# 	if curr_table.name == table_name:
 		# 		table = curr_table
 		
+
 		if not record_id in table.page_directory_buff.value_get():
 			return False	
 		
@@ -386,8 +403,8 @@ class Bufferpool:
 				updated_columns[i]=last_record.columns[i]
 		updated_record=Record(record.metadata, updated_columns)
 		return updated_record
-	
-				
+
+
 				
 
 			
