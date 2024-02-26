@@ -1,6 +1,6 @@
 from time import time
 from typing import Literal, TypedDict
-from lstore.bufferpool_ import BufferedDictValue, BufferedValue, FileHandler, MetadataPageID, PageID, PseudoBuffDictValue
+from lstore.bufferpool import BufferedDictValue, BufferedValue, FileHandler, MetadataPageID, PageID, PseudoBuffDictValue
 from lstore.helper import helper
 from lstore.base_tail_page import BasePage
 from lstore.config import config

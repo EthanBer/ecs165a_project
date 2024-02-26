@@ -1,7 +1,7 @@
 from lstore.ColumnIndex import DataIndex
 from lstore.base_tail_page import BasePage, TailPage
 from lstore.record_physical_page import PhysicalPage
-from bufferpool_ import FileHandler, FilePageReadResult
+from lstore.bufferpool import FileHandler, FilePageReadResult
 
 
 from lstore.config import config
