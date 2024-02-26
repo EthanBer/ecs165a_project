@@ -9,6 +9,7 @@ from lstore.config import WriteSpecifiedMetadata, config
 from lstore.helper import helper
 import struct
 from lstore.page_range import PageRange
+from lstore.bufferpool import PsuedoBuffIntValue
 
 
 class Query:
@@ -21,8 +22,9 @@ class Query:
 
     def __init__(self, table: Table):
         self.table = table
+        self.db_bpool = table.db_bufferpool # The bufferpool is the same for every table, because there is only one
         pass
-
+    
     """
     # internal Method
     # Read a record with specified RID
@@ -158,6 +160,8 @@ class Query:
 
     # gets the most up-to-date column value for a record.
     def get_updated_col(self, record: Record, col_idx: DataIndex) -> int | None:
+        return self.db_bpool.get_updated_col(self.table.name, record, DataIndex(col_idx))
+        """
         desired_col: int | None = record[col_idx]  # default to base page
         schema_encoding = record.schema_encoding
         if helper.ith_bit(schema_encoding, self.table.num_columns, col_idx,
@@ -176,7 +180,8 @@ class Query:
                 # curr_indirection = temp
             desired_col = self.table.get_record_by_rid(curr_rid)[col_idx]
         return desired_col
-        
+        """
+
     """
     # Read matching record with specified search key
     # :param search_key: the value you want to search based on
@@ -200,11 +205,11 @@ class Query:
         if search_key_index == self.table.key_index:  #
             rid = self.table.index.locate(search_key_index, search_key)
             if rid is not None:
-                valid_records.append(self.table.get_record_by_rid(rid))
+                valid_records.append(self.db_bpool.get_updated_record(self.table.name, rid, [1]*self.table.num_columns))
                 # print(f"record cols was {valid_records[0].columns}")
         else:
-            for rid in range(1, self.table.last_rid):
-                record = self.table.get_record_by_rid(rid)
+            for rid in range(1, PsuedoBuffIntValue(self, "catalog", config.byte_position.CATALOG_LAST_RID).value()):
+                record = self.db_bpool.get_updated_record(self.table.name, rid, [1]*self.table.num_columns)
                 if record.base_record == False:
                     continue
                 # print(f"record cols was {record.columns}")
@@ -215,7 +220,14 @@ class Query:
 
                 # get the latest version
                 # col_list = list(record.columns)
-                search_key_col = self.get_updated_col(record, search_key_index)
+
+
+
+                # DO WE NEED THIS?? BECAUSE WE DID get_updated_record we can assume that this is also updated
+                #search_key_col = self.get_updated_col(record, search_key_index)
+                search_key_col = self.db_bpool.get_updated_col(self.table.name, record, DataIndex(search_key_index))
+
+
                 # schema_encoding = record.schema_encoding
                 # if helper.ith_bit(schema_encoding, self.table.num_columns, search_key_index,
                 #                   False) == 0b1:  # check if the column has been updated.
@@ -245,7 +257,7 @@ class Query:
         for record in valid_records:
             col_list = list(record.columns)
             # print(f"col_list was {col_list}")
-            schema_encoding = record.schema_encoding
+            schema_encoding = record.schema_encoding # I think this is fine for this milestone because there is no concurrency
             for i in range(len(col_list)):
                 if projected_columns_index[i] == 0:
                     col_list[i] = None
@@ -253,7 +265,8 @@ class Query:
                     if record.rid == None:
                         continue
                     else:
-                        col_list[i] = self.get_updated_col(record, DataIndex(i))
+                        # col_list[i] = self.get_updated_col(record, DataIndex(i))
+                        col_list[i] = self.db_bpool.get_updated_col(self.table.name, record, DataIndex(i))
                         # if helper.ith_bit(schema_encoding, self.table.num_columns, i,
                         #                   False) == 0b1:  # check if the column has been updated.
                         #     # print("detected on schema encoding bit")
@@ -292,7 +305,6 @@ class Query:
     # Returns False if record locked by TPL
     # Assume that select will never be called on a key that doesn't exist
     """
-
     def select_version(self, search_key: int, search_key_index: DataIndex, projected_columns_index: list[Literal[0, 1]],
                        relative_version: int) -> list[Record] | Literal[False]:
         # search_key_index = DataIndex(search_key_index)
@@ -309,10 +321,10 @@ class Query:
             rid = self.table.index.locate(search_key_index, search_key)
             if rid is not None:
                 # raise(Exception("select should not be called on a key that doesn't exist"))
-                valid_records.append(self.table.get_record_by_rid(rid))
+                valid_records.append(self.db_bpool.get_updated_record(self.table.name, rid, [1]*self.table.num_columns))
         else:
-            for rid in range(1, self.table.last_rid):
-                rec = self.table.get_record_by_rid(rid)
+            for rid in range(1, PsuedoBuffIntValue(self, "catalog", config.byte_position.CATALOG_LAST_RID).value()):
+                rec = self.db_bpool.get_updated_record(self.table.name, rid, [1]*self.table.num_columns)
                 if rec.base_record == False:
                     continue
                 search_key_col = self.get_updated_col(rec, search_key_index)

@@ -652,6 +652,7 @@ class FileHandler:
 			assert byte_position is not None
 			file.seek(byte_position)
 			return int(file.read(8)) # assume buffered value is 8 bytes
+		
 	def read_dict_value(self, page_sub_path: Literal["page_directory", "indices"]) -> dict:
 		with open(page_sub_path, "rb") as handle:
 			return pickle.load(handle)

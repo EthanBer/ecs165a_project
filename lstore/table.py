@@ -7,7 +7,7 @@ from lstore.config import config
 from lstore.ColumnIndex import DataIndex, RawIndex
 
 import os 
-from lstore.page import Page
+#from lstore.page import Page
 from lstore.page_range import PageRange
 from lstore.record_physical_page import Record
 # from lstore.ColumnIndex import RawIndex, DataIndex
@@ -67,6 +67,10 @@ class Table:
         self.page_ranges.append(PageRange(self.num_columns, self.key_index, self.pages_per_range))
         # create a B-tree index object for the key index (hard-coded for M1)
         self.index.create_index(self.key_index)
+
+        self.db_bufferpool = None
+
+
     def ith_total_col_shift(self, col_idx: RawIndex) -> int: # returns the bit vector shifted to the indicated col idx
         return 0b1 << (self.total_columns - col_idx - 1)
 
@@ -151,7 +155,7 @@ class Table:
 
                         
                         self.get_updated_base_page(file_page_read_result,page_id)
-                        
+                
                 #page directory update 
             
                 
@@ -160,8 +164,7 @@ class Table:
 
 
 
-        
-
+    
     def merge(self):
         list_base_page=self.bring_base_pages_to_memory()
         pass
@@ -222,10 +225,3 @@ class Table:
         object_to_get_tps._value=indirection_column
         object_to_get_tps.flush()
           
-        
-
-
-
-            
-            
-            

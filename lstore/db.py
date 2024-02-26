@@ -9,6 +9,7 @@ from lstore.table import Table
 import os
 from  lstore.bufferpool import Bufferpool 
 from lstore.page_range import PageRange
+
 class Database():
 
     def __init__(self) -> None:
@@ -92,15 +93,16 @@ class Database():
     :param key_index: int             #Index of table key in columns
 
     """
-    """
+    
     def create_table(self, name : str, num_columns : int, key_index : DataIndex) -> Table:
         # key_index = DataIndex(key_index)
         table = Table(name, num_columns, key_index, config.PAGES_PER_PAGERANGE)
+        table.db_bufferpool = self.bpool
         self.tables.append(table)
         return table
 
     
-    """
+
     """
     # Deletes the specified table
     def drop_table(self, name):
