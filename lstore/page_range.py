@@ -1,6 +1,7 @@
 from lstore.ColumnIndex import DataIndex
 from lstore.base_tail_page import BasePage, TailPage
 from lstore.record_physical_page import PhysicalPage
+from bufferpool_ import FileHandler
 
 
 from lstore.config import config
@@ -49,42 +50,40 @@ class PageRange:
                     table_last_tail_id= int.from_bytes(catalog.readline())
                     table_last_rid= int.from_bytes(catalog.readline())
                 for file in os.listdir(table_path):
-                    if file =="base*":
+                    if file =="*page*":
                         page_id=int(file.split("_")[1]) # take the page id, may not work :( 
-                        #page= BasePage(table_num_columns, DataIndex(table_key_index))
-                        #page.id=page_id
-                        page_path = os.path.join(table_path,page_id)
-                        with open(page_path, "rb") as page_file:
-                            metadata_id= int(page_file.read(8))
-                            offset=  int(page_file.read(8))
-                            page_range_id=int(page_file.read(8))
-                            if page_range_id== self.page_range_id:
-                                metadata_path=os.path.join(table_path,metadata_id)
-                                with open(metadata_path,"rb") as metadata_file:
-                                    rid=metadata_file.read(offset)
-                                    timestamp=metadata_file.read(offset)
-                                    indirection_column=metadata_file.read(offset)
-                                    schema_encoding=metadata_file.read(offset)
-                                    null_column=metadata_file.read(offset)
-                                list_physical_pages=[]
-                                list_physical_pages.append(PhysicalPage(bytearray(rid), offset))
-                                list_physical_pages.append(PhysicalPage(bytearray(timestamp), offset))
-                                list_physical_pages.append(PhysicalPage(bytearray(indirection_column), offset))
-                                list_physical_pages.append(PhysicalPage(bytearray(schema_encoding), offset))
-                                list_physical_pages.append(PhysicalPage(bytearray(null_column), offset))
-                                while True:
-                                    physical_page_information=page_file.read(offset)
+        #                 #page= BasePage(table_num_columns, DataIndex(table_key_index))
+        #                 #page.id=page_id
+        #                 page_path = os.path.join(table_path,page_id)
+        #                 with open(page_path, "rb") as page_file:
+        #                     metadata_id= int(page_file.read(8))
+        #                     offset=  int(page_file.read(8))
+        #                     page_range_id=int(page_file.read(8))
+        #                     if page_range_id== self.page_range_id:
+        #                         metadata_path=os.path.join(table_path,metadata_id)
+        #                         with open(metadata_path,"rb") as metadata_file:
+        #                             rid=metadata_file.read(offset)
+        #                             timestamp=metadata_file.read(offset)
+        #                             indirection_column=metadata_file.read(offset)
+        #                             schema_encoding=metadata_file.read(offset)
+        #                             null_column=metadata_file.read(offset)
+        #                         list_physical_pages=[]
+        #                         list_physical_pages.append(PhysicalPage(bytearray(rid), offset))
+        #                         list_physical_pages.append(PhysicalPage(bytearray(timestamp), offset))
+        #                         list_physical_pages.append(PhysicalPage(bytearray(indirection_column), offset))
+        #                         list_physical_pages.append(PhysicalPage(bytearray(schema_encoding), offset))
+        #                         list_physical_pages.append(PhysicalPage(bytearray(null_column), offset))
+        #                         while True:
+        #                             physical_page_information=page_file.read(offset)
                                     
-                                    if not physical_page_information:
-                                        break
+        #                             if not physical_page_information:
+        #                                 break
                                     
-                                    physical_page_data = bytearray(physical_page_information)
-                                    physical_page = PhysicalPage(physical_page_data,offset)
-                                    list_physical_pages.append(physical_page)
-
-                                
-                                updated_physical_pages=self.get_updated_base_page(list_physical_pages)
-                                list_base_pages.append(updated_physical_pages)
+        #                             physical_page_data = bytearray(physical_page_information)
+        #                             physical_page = PhysicalPage(physical_page_data,offset)
+                        physical_pages=FileHandler.read_page(page_id,[1]*table_num_columns,[1]*config.NUM_METADATA_COL)                        
+                        updated_physical_pages=self.get_updated_base_page(physical_pages)
+                        list_base_pages.append(updated_physical_pages)
         return list_base_pages
 
     def merge(self):

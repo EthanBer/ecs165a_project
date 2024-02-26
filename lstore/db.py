@@ -16,6 +16,7 @@ class Database():
     
     def open(self, path):
         self.path=path
+        config.PATH = path
         #if database is new and there are previous files 
         try:
             os.mkdir(path)
@@ -47,8 +48,18 @@ class Database():
 
                 final_path=os.path.join(newpath,"page_directory")
                 with open(final_path, "rb") as index:
-                    table_index=pickle.load(index)
+                    table_index=pickle.load(index) #index
+                table=Table(table_num_columns,table_key_index,table_pages_per_range) 
+                table.page_directory_buff=table_page_directory
+                table.index=table_index
+                self.tables.append(table)
 
+
+
+
+
+                
+                """"
                 list_base_pages=[]
                 list_tail_page =[]
                 list_page_ranges = []
@@ -112,6 +123,7 @@ class Database():
                         elif file == "tail_page*":
                             list_page_ranges[-1].tail_pages.append(page)
                         num_page += 1
+                        """
              
         self.bpool=Bufferpool(path, self.tables)
 
