@@ -21,8 +21,9 @@ class Query:
 
     def __init__(self, table: Table):
         self.table = table
+        self.db_bpool = table.db_bufferpool # The bufferpool is the same for every table, because there is only one
         pass
-
+    
     """
     # internal Method
     # Read a record with specified RID
@@ -137,7 +138,6 @@ class Query:
     # Returns False if record locked by TPL
     # Assume that select will never be called on a key that doesn't exist
     """
-
     def select_version(self, search_key: int, search_key_index: DataIndex, projected_columns_index: list[Literal[0, 1]],
                        relative_version: int) -> list[Record] | Literal[False]:
         return False 
