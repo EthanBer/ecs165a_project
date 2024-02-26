@@ -23,6 +23,7 @@ class config:
 	class byte_position:
 		METADATA_PTR = 0
 		OFFSET = 8 
+		PAGE_RANGE_ID=16
 		CATALOG_LAST_BASE_ID = 0
 		CATALOG_LAST_TAIL_ID = 8
 		CATALOG_LAST_METADATA_ID = 16
@@ -31,17 +32,21 @@ class config:
 	BYTES_PER_INT = 8	
 
 class FullMetadata:
-	def __init__(self, rid: int | None, timestamp: int, indirection_column: int | None, schema_encoding: int, null_column: int | None):
+	def __init__(self, rid: int | None, timestamp: int, indirection_column: int | None, schema_encoding: int, null_column: int | None,base_rid:int):
 		self.rid = rid
 		self.timestamp = timestamp
 		self.indirection_column = indirection_column
 		self.schema_encoding = schema_encoding
 		self.null_column = null_column
+		self.base_rid=base_rid
+		
+
 class WriteSpecifiedMetadata:
-	def __init__(self, indirection_column: int | None, schema_encoding: int, null_column: int | None):
+	def __init__(self, indirection_column: int | None, schema_encoding: int, null_column: int | None, base_rid: int):
 		# self.rid = rid
 		# self.timestamp = timestamp
 		self.indirection_column = indirection_column
 		self.schema_encoding = schema_encoding
 		self.null_column = null_column
-
+		self.base_rid=base_rid
+		

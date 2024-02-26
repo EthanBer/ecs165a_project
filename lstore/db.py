@@ -35,9 +35,11 @@ class Database():
                     table_num_columns= int.from_bytes(catalog.readline())
                     table_key_index= int.from_bytes(catalog.readline())
                     table_pages_per_range = int.from_bytes(catalog.readline())
-                    table_last_page_id = int.from_bytes(catalog.readline())
+                    table_last_base_page_id = int.from_bytes(catalog.readline())
                     table_last_tail_id= int.from_bytes(catalog.readline())
                     table_last_rid= int.from_bytes(catalog.readline())
+                    tps=int.from_bytes(catalog.readline())
+                    
 
                 final_path=os.path.join(newpath,"page_directory")
                 with open(final_path, "rb") as page_directory:
@@ -66,9 +68,25 @@ class Database():
 
                         page_path=os.path.join(newpath,file)
                         with open(page_path, "rb") as page_file:
-                            metadata = int(page_file.read(8))
+                            metadata_id = int(page_file.read(8))
                             offset= int(page_file.read(8))
+                            page_range_id= int(page_file.read(8))
+                            new_page_range.page_range_id=page_range_id
+                    
+                            metadata_path=os.path.join(newpath,metadata_id)
+                            with open(metadata_path,"rb") as metadata_file:
+                                rid=metadata_file.read(offset)
+                                timestamp=metadata_file.read(offset)
+                                indirection_column=metadata_file.read(offset)
+                                schema_encoding=metadata_file.read(offset)
+                                null_column=metadata_file.read(offset)
                             list_physical_pages=[]
+                            list_physical_pages.append(PhysicalPage(bytearray(rid), offset))
+                            list_physical_pages.append(PhysicalPage(bytearray(timestamp), offset))
+                            list_physical_pages.append(PhysicalPage(bytearray(indirection_column), offset))
+                            list_physical_pages.append(PhysicalPage(bytearray(schema_encoding), offset))
+                            list_physical_pages.append(PhysicalPage(bytearray(null_column), offset))
+
                             while True:
                                 physical_page_information=page_file.read(offset)
                                 
@@ -76,9 +94,7 @@ class Database():
                                     break
                                 
                                 physical_page_data = bytearray(physical_page_information)
-                                physical_page = PhysicalPage()
-                                physical_page.offset = offset
-                                physical_page.data = physical_page_data
+                                physical_page = PhysicalPage(physical_page_data,offset)
                                 list_physical_pages.append(physical_page)
 
                             page.physical_pages=list_physical_pages
