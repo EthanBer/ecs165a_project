@@ -4,9 +4,6 @@ import typing
 from lstore.ColumnIndex import DataIndex, RawIndex
 from lstore.config import config
 
-
-if typing.TYPE_CHECKING:
-	from lstore.page import Page
 class helper:
 	@staticmethod
 	def str_each_el(arr: list, delim: str="") -> str:

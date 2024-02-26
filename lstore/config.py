@@ -48,11 +48,10 @@ class FullMetadata:
 		
 
 class WriteSpecifiedMetadata:
-	def __init__(self, indirection_column: int | None, schema_encoding: int, null_column: int | None, base_rid: int):
+	def __init__(self, indirection_column: int | None, schema_encoding: int, null_column: int | None):
 		# self.rid = rid
 		# self.timestamp = timestamp
 		self.indirection_column = indirection_column
 		self.schema_encoding = schema_encoding
 		self.null_column = null_column
-		self.base_rid=base_rid
 		
