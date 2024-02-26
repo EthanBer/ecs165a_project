@@ -137,7 +137,7 @@ class Query:
         # the null column in this Metadata object won't be used by the page insert.
         # print(f"trying to insert")
         # print(f"trying to insert {columns}")
-        page_directory_entry = self.table.file_handler.insert_record(WriteSpecifiedMetadata(None, 0b0, None), *columns)
+        page_directory_entry = self.table.file_handler.insert_record("base", WriteSpecifiedMetadata(None, 0b0, None), *columns)
         # print(f"rid: {rid}")
 
         # if rid == -1:

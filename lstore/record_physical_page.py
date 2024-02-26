@@ -1,11 +1,11 @@
 import struct
 from typing import Annotated
-from lstore.config import WriteSpecifiedMetadata, config
+from lstore.config import FullMetadata, WriteSpecifiedMetadata, config
 from lstore.helper import helper
 
 
 class Record:
-    def __init__(self, metadata: WriteSpecifiedMetadata, base_record: bool, *columns : int | None):
+    def __init__(self, metadata: FullMetadata, base_record: bool, *columns : int | None):
         # self.indirection_column = metadata.indirection_column
         # self.timestamp = metadata.timestamp
         # self.rid = metadata.rid
@@ -23,7 +23,7 @@ class Record:
 
 class BaseRecord(Record):
     def __init__(self, metadata: WriteSpecifiedMetadata, key: int, *columns: int | None):
-        super().__init__(metadata, *columns)
+        super().__init__(metadata, "base", *columns)
         self.key = key
     # def __str__(self) -> str:
     #     # NOTE: the self.columns is just the physical values in the columns. 
@@ -59,34 +59,33 @@ class PhysicalPage:
         self.offset += 8  
 
     
-    def __get_nth_record__(self, record_idx: int) -> int | None:
-        if record_idx == -1:
-            return int(self.data[-8:])
-            #return Record()
+    # TODO: move get_check_for_none into this function?
+    # def __get_nth_record__(self, record_idx: int) -> int | None:
+    #     if record_idx == -1:
+    #         return int(self.data[-8:])
+    #         #return Record()
         
-        num_records = self.offset / 8
-        if (record_idx > num_records-1):
-            # raise(Exception("get nth record read fail: out of bounds index"))
-            return None # TODO: fix?
+    #     num_records = self.offset / 8
+    #     if (record_idx > num_records-1):
+    #         # raise(Exception("get nth record read fail: out of bounds index"))
+    #         return None # TODO: fix?
         
-        # value = struct.unpack(config.PACKING_FORMAT_STR, self.data[(record_idx * 8) : (record_idx * 8)+8])[0]
-        value = helper.unpack_data(self.data, record_idx)
+    #     # value = struct.unpack(config.PACKING_FORMAT_STR, self.data[(record_idx * 8) : (record_idx * 8)+8])[0]
+    #     value = helper.unpack_data(self.data, record_idx)
 
+    #     if (value != 0):
+    #         ## print("Value: ", value, "Index: ", record_idx)
+    #         # # print("num records: ", num_records) # print("offset: ", self.offset)
+    #         pass
 
-
-        if (value != 0):
-            ## print("Value: ", value, "Index: ", record_idx)
-            # # print("num records: ", num_records) # print("offset: ", self.offset)
-            pass
-
-        return value
+    #     return value
     
 
-    def __str__(self) -> str:
-        physical_page_contents: list[int | None] = []
-        for i in range(64):
-            rec = self.__get_nth_record__(i)
-            # if rec is None:
-            #     warn(Exception("a value was None when getting nth record for str function in PhysicalPage."))
-            physical_page_contents.append(rec)
-        return str(physical_page_contents)
+    # def __str__(self) -> str:
+    #     physical_page_contents: list[int | None] = []
+    #     for i in range(64):
+    #         rec = self.__get_nth_record__(i)
+    #         # if rec is None:
+    #         #     warn(Exception("a value was None when getting nth record for str function in PhysicalPage."))
+    #         physical_page_contents.append(rec)
+    #     return str(physical_page_contents)

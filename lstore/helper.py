@@ -17,13 +17,14 @@ class helper:
 		return RawIndex(idx + config.NUM_METADATA_COL)
 
 	@staticmethod
-	def unpack_data(data: bytearray, record_idx: int) -> int: # idx is the byte index of desired data
+	def unpack_data(data: bytearray, record_offset: int) -> int: 
 		# # print(f"data{data}", record_idx)
-		return struct.unpack(config.PACKING_FORMAT_STR, data[record_idx*8:record_idx*8+8])[0]
+		return int.from_bytes(data[record_offset:record_offset+8], byteorder="big")
+		# return struct.unpack(config.PACKING_FORMAT_STR, data[record_offset:record_offset+8])[0]
 	
-	@staticmethod
-	def unpack_col(page: 'Page', col_idx: RawIndex, record_idx: int) -> int: # col_idx is the index of the desired physical page in which the data is stored
-		return helper.unpack_data(page.physical_pages[col_idx].data, record_idx)
+	# @staticmethod
+	# def unpack_col(page: 'Page', col_idx: RawIndex, record_idx: int) -> int: # col_idx is the index of the desired physical page in which the data is stored
+	# 	return helper.unpack_data(page.physical_pages[col_idx].data, record_idx)
 
 	@staticmethod
 	def ith_total_col_shift(total_cols: int, col_idx: RawIndex | int, total_cols_is_total_table_cols: bool = True) -> int: # returns the bit vector shifted to the indicated col idx
@@ -43,7 +44,9 @@ class helper:
 
 	# helper function to type cast list 
 	# https://www.geeksforgeeks.org/python-type-casting-whole-list-and-matrix/
+	# U = typing.TypeVar("U")
+	T = typing.TypeVar("T")
 	@staticmethod
-	def cast_list(test_list, data_type):
-		return list(map(data_type, test_list))
+	def cast_list(test_list: list, data_type: T) -> list[T]:
+		return list(map(data_type, test_list)) # type: ignore[call-overload]
      

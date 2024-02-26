@@ -8,6 +8,7 @@ from lstore.config import config
 from lstore.helper import helper
 import threading
 import os 
+
 class PageRange:
     def __init__(self, num_columns: int, key_col: DataIndex, pages_per_range: int):
         assert pages_per_range >= 1, "pages per range must be >= 1"
@@ -19,10 +20,8 @@ class PageRange:
         self.pages_per_range = pages_per_range
         #milestone 2 
         self.updates_count=0
-        self.path= None 
-        self.table_name= None
-        self.page_range_id= config.ID_COUNT 
-        config.ID_COUNT += 1
+        self.path = ""
+        self.table_name = ""
 
 
 
@@ -122,7 +121,7 @@ class PageRange:
         return updated_base_page 
 
 
-    def increase_update_count(self):
+    def increase_update_count(self) -> None:
         self.updates_count=+1
         if self.updates_count>config.UPDATES_BEFORE_MERGE:
             merge_thread = threading.Thread(self.merge(), daemon=True)
