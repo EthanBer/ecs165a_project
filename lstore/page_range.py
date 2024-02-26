@@ -1,7 +1,7 @@
 from lstore.ColumnIndex import DataIndex
 from lstore.base_tail_page import BasePage, TailPage
 from lstore.record_physical_page import PhysicalPage
-from bufferpool_ import FileHandler
+from bufferpool_ import FileHandler, FilePageReadResult
 
 
 from lstore.config import config
@@ -81,30 +81,45 @@ class PageRange:
                                     
         #                             physical_page_data = bytearray(physical_page_information)
         #                             physical_page = PhysicalPage(physical_page_data,offset)
-                        physical_pages=FileHandler.read_page(page_id,[1]*table_num_columns,[1]*config.NUM_METADATA_COL)                        
-                        updated_physical_pages=self.get_updated_base_page(physical_pages)
-                        list_base_pages.append(updated_physical_pages)
+                        file_page_read_result=FileHandler.read_page(page_id,[1]*table_num_columns,[1]*config.NUM_METADATA_COL)                        
+                        updated_base_page=self.get_updated_base_page(file_page_read_result)
+                        #now we need to write the updated base_page 
         return list_base_pages
 
     def merge(self):
-        list_base_pages=self.bring_base_pages_to_memory()
-        self.get_updated_base_page(list_base_pages)
+        list_base_page=self.bring_base_pages_to_memory()
+        
 
 
 
 
         pass
 
-    def get_updated_base_page(self,list_base_pages):
-        updated_base_pages=[]
+    def get_updated_base_page(self,file_page_read_result):
+        physical_pages=file_page_read_result.data_physical_pages
+        metadata=file_page_read_result.metadata_physical_pages
+        offset=physical_pages[0].offset 
+        num_records=offset/8
+        
+        
+        
 
-        indirection_column=sle
-        for base_page in list_base_pages:
+        
+        for i in range num_records:
+            indirection_column=metadata[config.INDIRECTION_COLUMN].data[8*i : 8(i+1)]
+            schema_encoding=metadata[config.SCHEMA_ENCODING_COLUMN].data[8*i : 8(i+1)]
+            
+            
+            
+            
 
 
         
 
-        return updated_base_pages
+
+        
+
+        return updated_base_page 
 
 
     def increase_update_count(self):

@@ -11,10 +11,13 @@ from lstore.page import Page
 from lstore.page_range import PageRange
 from lstore.record_physical_page import Record
 # from lstore.ColumnIndex import RawIndex, DataIndex
+import threading
+
 
 INDIRECTION_COLUMN = 0
 RID_COLUMN = 1
 SCHEMA_ENCODING_COLUMN = 2
+#mutex_lock= threading.Lock()
 
 
 class PageDirectoryEntry:
@@ -96,7 +99,7 @@ class Table:
     # def __merge(self):
     #     print("merge is happening")
     #     pass
-    def bring_base_pages_to_memory(self)->list[BasePage]:
+    def bring_base_pages_to_memory(self)-> None:
         list_base_pages=[]
         for table_name in os.listdir(self.path):
             if self.table_name==table_name:
@@ -110,7 +113,7 @@ class Table:
                     table_last_page_id = int.from_bytes(catalog.read(8))
                     table_last_tail_id= int.from_bytes(catalog.read(8))
                     table_last_rid= int.from_bytes(catalog.read(8))
-                    tps=int.from_bytes(catalog.read(8))
+                    
                 for file in os.listdir(table_path):
                     if file =="*page*":
                         page_id=int(file.split("_")[1]) # take the page id, may not work :( 
@@ -143,24 +146,30 @@ class Table:
                                     
         #                             physical_page_data = bytearray(physical_page_information)
         #                             physical_page = PhysicalPage(physical_page_data,offset)
-                        file_page_read_result=FileHandler.read_page(page_id,[1]*table_num_columns,[1]*config.NUM_METADATA_COL)                        
-                        updated_base_page=self.get_updated_base_page(file_page_read_result,tps)
-                        #now we need to write the updated base_page
+                        file_page_read_result=FileHandler.read_page(page_id,[1]*table_num_columns,[1]*config.NUM_METADATA_COL)     
+
+
+                        
+                        self.get_updated_base_page(file_page_read_result,page_id)
+                        
+                #page directory update 
+            
+                
+                    
+                
 
 
 
-        return list_base_pages
+        
 
     def merge(self):
         list_base_page=self.bring_base_pages_to_memory()
-        
-
-
-
-
         pass
 
-    def get_updated_base_page(self,file_page_read_result,tps):
+    def get_updated_base_page(self,file_page_read_result,page_id):
+        object_to_get_tps=PseudoBuffDictValue(FileHandler,page_id,config.TPS)
+        tps=self.get_updated_base_page(file_page_read_result,object_to_get_tps.value())
+        
         physical_pages=file_page_read_result.data_physical_pages
         metadata=file_page_read_result.metadata_physical_pages
         total_columns=len(physical_pages)+ len(metadata)
@@ -201,17 +210,19 @@ class Table:
                     tail_indirection_column=tail_metadata_page[config.INDIRECTION_COLUMN].data[8*tail_offset: 8*(tail_offset+1)]
                     tail_schema_encoding=tail_metadata_page[config.SCHEMA_ENCODING_COLUMN].data[8*tail_offset : 8*(tail_offset+1)]
                     tail_null_column=metadata[config.NULL_COLUMN].data[8*tail_offset : 8*(tail_offset+1)]
-
+                    
 
                 physical_pages[j].data[8*i : 8*(i+1)]=tail_physical_page[i].data[tail_offset*8:(tail_offset+1)*8]
         #change schema encoding of the updated entry of the base page 
             metadata[config.SCHEMA_ENCODING_COLUMN].data[i*8:8*(i+1)]=0
-            metadata[config.BASE_RID].data[i*8:8*(i+1)]=??????????????????????????????????? 
-            
-            
         
-        return [metadata,physical_pages]
-                
+        final_physical_pages=metadata+physical_pages
+        #create new base page file with the updated information
+        FileHandler.write_new_page(final_physical_pages, "base")
+        object_to_get_tps._value=indirection_column
+        object_to_get_tps.flush()
+          
+        
 
 
 

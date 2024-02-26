@@ -396,13 +396,13 @@ class Bufferpool:
 		indirection_column = record.metadata.indirection_column
 		updated_columns = [None]* len(projected_columns_index)
 		last_record = record
-		for i in range(len(projected_columns_index)):
+		for i in range(len(projected_columns_index)): #this works but could be implemented better
 			if projected_columns_index[i] == 1: 
 				while (last_record.metadata.schema_encoding & 1 << (len(projected_columns_index) + config.NUM_METADATA_COL - i))!=0: #go back in case it was updated previously
 					indirection_column = last_record.metadata.indirection_column
 					last_record = self.get_record(table_name, indirection_column, projected_columns_index)
 				updated_columns[i]=last_record.columns[i]
-		updated_record=Record(record.metadata, False, tuple(updated_columns))
+		updated_record=Record(record.metadata, False, updated_columns)
 		return updated_record
 
 
