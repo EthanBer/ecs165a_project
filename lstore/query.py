@@ -347,24 +347,24 @@ class Query:
                             # print("detected on schema encoding bit")
                             assert record.indirection_column is not None, "inconsistent state: schema_encoding bit on but indirection was None"
                             curr_rid = record.indirection_column
-                            curr_schema_encoding = self.table.get_record_by_rid(curr_rid).schema_encoding
+                            curr_schema_encoding = self.db_bpool.get_updated_record(self.table.name, curr_rid, [1]*self.table.num_columns).schema_encoding
                             counter = 0
                             overversioned = False
                             while counter > relative_version or helper.ith_bit(curr_schema_encoding,
                                                                                self.table.num_columns, i, False) == 0b0:
-                                temp = self.table.get_record_by_rid(curr_rid)
+                                temp = self.db_bpool.get_updated_record(self.table.name, curr_rid, [1]*self.table.num_columns)
                                 if temp is None:
                                     overversioned = True
                                     break
                                 assert temp.indirection_column is not None, "looped back to base record? indirection_column == None"
                                 curr_rid = temp.indirection_column
-                                curr_schema_encoding = self.table.get_record_by_rid(curr_rid).schema_encoding
+                                curr_schema_encoding = self.db_bpool.get_updated_record(self.table.name, curr_rid, [1]*self.table.num_columns).schema_encoding
                                 counter -= 1
                                 # curr_rid, curr_schema_encoding = temp.indirection_column, temp.schema_encoding
                                 # curr_indirection = temp
                             if overversioned is True :
                                 curr_rid = record.indirection_column
-                            col_list[i] = self.table.get_record_by_rid(curr_rid)[i]
+                            col_list[i] = self.table.self.db_bpool.get_updated_record(self.table.name, curr_rid, [1]*self.table.num_columns)[i]
                     # rec.columns[i] = None  # filter out that column from the projection
             record.columns = tuple(col_list)
             ret.append(record)
