@@ -4,10 +4,12 @@ from lstore import pseudo_buff_dict_value
 from lstore.ColumnIndex import DataIndex
 #from lstore.base_tail_page import Page
 from lstore.config import config
-from lstore.file_handler import Table
+from lstore.helper import helper
+from lstore.index import Index
+from lstore.page_directory_entry import BasePageID, MetadataPageID, TailPageID
 from lstore.record_physical_page import PhysicalPage
 import os
-from  lstore.bufferpool import Bufferpool 
+from  lstore.bufferpool import Bufferpool, Table
 class Database():
 
     def __init__(self) -> None:
@@ -26,35 +28,26 @@ class Database():
             os.mkdir(path)
         except:  #the db is empty so there are no tables to load to bufferpool
             pass
+        self.bpool=Bufferpool(path)
         for table_name in os.listdir(path):
-            table_path = os.path.join(path, table_name)
             if self.table_by_name(table_name) is None:
                 with open(os.path.join(path, table_name, "catalog"), "rb") as catalog_file:
                     num_columns= int.from_bytes(catalog_file.read(8), "big")
                     key_index= DataIndex(int.from_bytes(catalog_file.read(8), "big"))
                     # RID generation is handled by FileHandler
+                    # with open(os.path.join())
+                    # self.tables.append(Table(table_name, ))
+                    # with open(file_handler.table_file_path("catalog"), 'rb') as catalog:
 
-            page_dir_path = os.path.join(table_path, "page_directory.pickle")
-            with open(page_dir_path, "rb") as page_directory:
-                table_page_directory = pickle.load(page_directory)
-
-            # final_path=os.path.join(newpath,"page_directory")
-            index_path = os.path.join(table_path, "indices.pickle")
-            with open(index_path, "rb") as index:
-                table_index = pickle.load(index)
-                # with open(os.path.join())
-                # self.tables.append(Table(table_name, ))
-                # with open(file_handler.table_file_path("catalog"), 'rb') as catalog:
-
-            table = Table(table_name, num_columns, key_index)
-            self.tables.append(table)
+                table = Table(table_name, num_columns, key_index, path, self.bpool)
+                self.tables.append(table)
             # table_names.append(table_name)
 
-        self.bpool=Bufferpool(path, self.tables)
 
     def close(self) -> None:
         self.bpool.close_bufferpool()
         self.tables.clear()
+
 
         
     """
@@ -66,8 +59,12 @@ class Database():
     """
     def create_table(self, name : str, num_columns : int, key_index: int) -> Table:
         key_index = DataIndex(key_index)
-        table = Table(name, num_columns, key_index)
+        table_path = os.path.join(self.path, name)
+        os.mkdir(table_path)
+        table = Table(name, num_columns, key_index, self.path, self.bpool)
         self.tables.append(table)
+
+        # initialize catalog file
         return table
 
     

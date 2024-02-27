@@ -13,6 +13,12 @@ class TailPageID(PageID):
 class MetadataPageID(PageID):
 	pass
 
+class BaseRID(int):
+	pass
+
+class TailRID(int):
+	pass
+
 class PageDirectoryEntry:
     def __init__(self, page_id: 'PageID', metadata_page_id: 'MetadataPageID', offset: int, page_type: Literal["base", "tail"]):
         self.page_id = page_id

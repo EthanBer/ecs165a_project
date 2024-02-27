@@ -1,6 +1,6 @@
 from typing import Literal
+from lstore.bufferpool import PsuedoBuffIntValue, Table
 from lstore.ColumnIndex import DataIndex, RawIndex
-from lstore.file_handler import Table
 from lstore.page_directory_entry import PageDirectoryEntry
 #from lstore.pseudo_buff_dict_value import Record
 from lstore.record_physical_page import Record
@@ -10,8 +10,6 @@ import time
 from lstore.config import WriteSpecifiedMetadata, config
 from lstore.helper import helper
 import struct
-from lstore.page_range import PageRange
-from lstore.bufferpool import PsuedoBuffIntValue
 
 
 class Query:
@@ -24,7 +22,7 @@ class Query:
 
     def __init__(self, table: Table):
         self.table = table
-        self.db_bpool = table.db_bufferpool  # The bufferpool is the same for every table, because there is only one
+        self.db_bpool = table.db_bpool  # The bufferpool is the same for every table, because there is only one
         pass
 
     """
@@ -64,7 +62,9 @@ class Query:
             page.physical_pages[config.NULL_COLUMN].data[offset*8:offset*8+8] = packed_data
             indirection_column = struct.unpack('>Q', page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]
         """
-        return self.update(primary_key, *([None] * self.table.num_columns), delete=True)
+        # TODO: implement and uncomment
+        return False
+        # return self.update(primary_key, *([None] * self.table.num_columns), delete=True)
         # bitmask = 1 << (self.table.num_columns - config.RID_COLUMN - 1)
         # page_dir_entry = self.table.page_directory[record.rid]
         # page = page_dir_entry.page
@@ -75,7 +75,8 @@ class Query:
 
         # return
 
-    def insert_tail(self, page_range: PageRange, indirection_column: int, schema_encoding: int,
+    """
+    def insert_tail(self, indirection_column: int, schema_encoding: int,
                     *columns: int | None) -> int:  # returns RID if successful
         tail_page = page_range.tail_pages[-1]
         timestamp = int(time.time())
@@ -111,6 +112,7 @@ class Query:
 
         # if rid == -1:
         # pass
+    """
 
     """
     # Insert a record with specified columns
@@ -142,7 +144,7 @@ class Query:
         # the null column in this Metadata object won't be used by the page insert.
         # print(f"trying to insert")
         # print(f"trying to insert {columns}")
-        page_directory_entry = self.table.file_handler.insert_record("base", WriteSpecifiedMetadata(None, 0b0, None),
+        rid = self.table.file_handler.insert_record("base", WriteSpecifiedMetadata(None, 0b0, None),
                                                                      *columns)
         # print(f"rid: {rid}")
 
@@ -150,11 +152,6 @@ class Query:
         #     self.table.page_ranges.append(PageRange(self.table.num_columns, self.table.key_index))
         #     rid = self.table.page_ranges[-1].base_pages[-1].insert(Metadata(None, self.table.last_rid, timestamp, schema_encoding), *columns)
 
-        if rid == -1:
-            raise (Exception("insert failed"))
-
-        self.table.page_directory_buff[rid] = page_directory_entry
-        self.table.last_rid += 1
 
         self.table.index.update_index(self.table.key_index,
                                       columns[self.table.key_index],
@@ -164,7 +161,7 @@ class Query:
 
     # gets the most up-to-date column value for a record.
     def get_updated_col(self, record: Record, col_idx: DataIndex) -> int | None:
-        return self.db_bpool.get_updated_col(self.table.name, record, DataIndex(col_idx))
+        return self.db_bpool.get_updated_col(self.table, record, DataIndex(col_idx))
         """
         desired_col: int | None = record[col_idx]  # default to base page
         schema_encoding = record.schema_encoding
@@ -209,12 +206,14 @@ class Query:
         if search_key_index == self.table.key_index:  #
             rid = self.table.index.locate(search_key_index, search_key)
             if rid is not None:
-                valid_records.append(
-                    self.db_bpool.get_updated_record(self.table.name, rid, [1] * self.table.num_columns))
+                record = self.db_bpool.get_updated_record(self.table, rid, [1] * self.table.num_columns)
+                assert record is not None, "record was not none even though rid was none"
+                valid_records.append(record)
                 # print(f"record cols was {valid_records[0].columns}")
         else:
-            for rid in range(1, PsuedoBuffIntValue(self, "catalog", config.byte_position.CATALOG_LAST_RID).value()):
-                record = self.db_bpool.get_updated_record(self.table.name, rid, [1] * self.table.num_columns)
+            for rid in range(1, PsuedoBuffIntValue(self.table.file_handler, "catalog", config.byte_position.catalog.LAST_BASE_RID).value()):
+                record = self.db_bpool.get_updated_record(self.table, rid, [1] * self.table.num_columns)
+                assert record is not None
                 if record.base_record == False:
                     continue
                 # print(f"record cols was {record.columns}")
@@ -228,7 +227,7 @@ class Query:
 
                 # DO WE NEED THIS?? BECAUSE WE DID get_updated_record we can assume that this is also updated
                 # search_key_col = self.get_updated_col(record, search_key_index)
-                search_key_col = self.db_bpool.get_updated_col(self.table.name, record, DataIndex(search_key_index))
+                search_key_col = self.db_bpool.get_updated_col(self.table, record, DataIndex(search_key_index))
 
                 # schema_encoding = record.schema_encoding
                 # if helper.ith_bit(schema_encoding, self.table.num_columns, search_key_index,
@@ -259,16 +258,16 @@ class Query:
         for record in valid_records:
             col_list = list(record.columns)
             # print(f"col_list was {col_list}")
-            schema_encoding = record.schema_encoding  # I think this is fine for this milestone because there is no concurrency
+            schema_encoding = record.metadata.schema_encoding  # I think this is fine for this milestone because there is no concurrency
             for i in range(len(col_list)):
                 if projected_columns_index[i] == 0:
                     col_list[i] = None
                 else:
-                    if record.rid == None:
+                    if record.metadata.rid == None:
                         continue
                     else:
                         # col_list[i] = self.get_updated_col(record, DataIndex(i))
-                        col_list[i] = self.db_bpool.get_updated_col(self.table.name, record, DataIndex(i))
+                        col_list[i] = self.db_bpool.get_updated_col(self.table, record, DataIndex(i))
                         # if helper.ith_bit(schema_encoding, self.table.num_columns, i,
                         #                   False) == 0b1:  # check if the column has been updated.
                         #     # print("detected on schema encoding bit")
@@ -325,13 +324,13 @@ class Query:
             if rid is not None:
                 # raise(Exception("select should not be called on a key that doesn't exist"))
                 valid_records.append(
-                    self.db_bpool.get_version_record(self.table.name, rid, [1] * self.table.num_columns, relative_version))
+                    helper.not_null(self.db_bpool.get_version_record(self.table, rid, [1] * self.table.num_columns, relative_version)))
         else:
-            for rid in range(1, PsuedoBuffIntValue(self, "catalog", config.byte_position.CATALOG_LAST_RID).value()):
-                rec = self.db_bpool.get_version_record(self.table.name, rid, [1] * self.table.num_columns, relative_version)
+            for rid in range(1, PsuedoBuffIntValue(self.table.file_handler, "catalog", config.byte_position.catalog.LAST_BASE_RID).value()):
+                rec = helper.not_null(self.db_bpool.get_version_record(self.table, rid, [1] * self.table.num_columns, relative_version))
                 if rec.base_record == False:
                     continue
-                search_key_col = self.db_bpool.get_version_col(self.table.name, rec, search_key_index, relative_version)
+                search_key_col = self.db_bpool.get_version_col(self.table, rec, search_key_index, relative_version)
                 if search_key_col == search_key:
                     valid_records.append(rec)
                 #     valid_records.append(rid)
@@ -374,8 +373,8 @@ class Query:
             #                 col_list[i] = self.table.self.db_bpool.get_updated_record(self.table.name, curr_rid,
             #                                                                           [1] * self.table.num_columns)[i]
             #         # rec.columns[i] = None  # filter out that column from the projection
-            curr_rid = record
-            record.columns = self.db_bpool.get_version_record(self.table.name, curr_rid,[1] * self.table.num_columns,relative_version)
+            curr_rid = helper.not_null(record.metadata.rid)
+            record.columns = helper.not_null(self.db_bpool.get_version_record(self.table, curr_rid,[1] * self.table.num_columns,relative_version)).columns
             ret.append(record)
 
             # for i, column_value, data_index_indicator in enumerate(zip(rec.columns, projected_columns_index)):
@@ -393,6 +392,9 @@ class Query:
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
 
+    # TODO: implement and uncomment
+    """
+    
     def update(self, primary_key: int, *columns: int | None, **kwargs: bool) -> bool:
         delete = kwargs.get("delete")
         if delete is None:
@@ -412,12 +414,12 @@ class Query:
         # assert len(primary_key_matches) == 1 # primary key results in ONE select result
         # select indirection and rid columns
         base_record = primary_key_matches[0]
-        base_page_dir_entry = self.table.page_directory_buff[base_record.rid]
+        base_page_dir_entry = self.table.page_directory_buff[helper.not_null(base_record.metadata.rid)]
         page_range = base_page_dir_entry.page_range
         # self.insert_tail(tail_page, )
 
         tail_1_values: list[int | None] = [None] * len(columns)
-        tail_1_indirection: int = base_record.rid if base_record.indirection_column is None else base_record.indirection_column
+        tail_1_indirection: int = helper.not_null(base_record.metadata.rid) if base_record.metadata.indirection_column is None else base_record.metadata.indirection_column
         tail_1_schema_encoding = 0b1 << self.table.num_columns  # ..for now. we also need to take into account which columns were updated
         tail_schema_encoding = 0b0  # ..for now. we need to take into account updated columns
         tail_indirection: int = 0
@@ -544,6 +546,7 @@ class Query:
         #     if column is not None:
 
         # indirection of base = RID of tail
+    """
 
     """
     :param start_range: int         # Start of the key range to aggregate 
@@ -651,6 +654,8 @@ class Query:
     # Returns False if no record matches key or if target record is locked by 2PL.
     """
 
+    # TODO: implement and uncomment
+    """
     def increment(self, key: int, column: DataIndex) -> bool:
         r = self.select(key, self.table.key_index, [1] * self.table.num_columns)[0]
         if r is not False:
@@ -663,3 +668,4 @@ class Query:
             u = self.update(key, False, *updated_columns)
             return u
         return False
+    """

@@ -1,9 +1,7 @@
 """
 A  -Trees, but other data structures can be used as well.
 """
-
 from BTrees.OOBTree import OOBTree # type: ignore
-from lstore.file_handler import Table 
 
 
 # Tree
@@ -13,9 +11,9 @@ class BTree(OOBTree):
     pass
 class Index:
 
-    def __init__(self, table: Table):
+    def __init__(self, num_columns: int):
         # One index for each table. All our empty initially.
-        self.indices: list[BTree | None] = [None] * table.num_columns
+        self.indices: list[BTree | None] = [None] * num_columns
 
         pass
 

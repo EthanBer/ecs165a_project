@@ -19,21 +19,37 @@ class config:
 	PATH = "./Pages"
 
 	BUFFERPOOL_SIZE = 256
+	INITIAL_TPS = (2**64) - 1
+	# BASE_PAGE_FILE_SCHEMA = ["metadata_pointer", "offset", "TPS", "base_data"]
+	# TAIL_PAGE_FILE_SCHEMA = ["metadata_pointer", "offset", "tail_data"]
+	# METADATA_PAGE_FILE_SCHEMA = ["offset", "metadata"]
+	# CATALOG_FILE_SCHEMA = ["num_columns", "key_index", "last_base_page_id", "last_tail_page_id", "last_metadata_page_id", "last_rid"]
 
 	class byte_position:
-		METADATA_PTR = 0
-		OFFSET = 8 
-		PAGE_RANGE_ID=16
-
-
-		CATALOG_TABLE_NUMBER_COLUMNS=0 
-		CATALOG_KEY_INDEX= 8
-		CATALOG_PAGES_PER_PAGE_RANGE=16
-		CATALOG_LAST_BASE_ID = 24
-		CATALOG_LAST_TAIL_ID = 32
-		CATALOG_LAST_METADATA_ID = 40
-		CATALOG_LAST_RID = 48
-		CATALOG_TPS=56
+		# @staticmethod
+		# def get_base_offset(field: str) -> int:
+		# 	idx = config.BASE_PAGE_FILE_SCHEMA.index(field)
+		# 	return config.BYTES_PER_INT * idx
+		# @staticmethod
+		# def get_tail_offset(field: str) -> int:
+		# 	idx = config.TAIL_PAGE_FILE_SCHEMA.index(field)
+		# 	return config.BYTES_PER_INT * idx
+		class base_tail:
+			METADATA_PTR = 0
+			OFFSET = 8 
+			TPS = 16
+			DATA = 24
+		class metadata:
+			OFFSET = 0
+			DATA = 8
+		class catalog:
+			NUMBER_COLUMNS = 0
+			KEY_INDEX = 8
+			LAST_BASE_PAGE_ID = 16
+			LAST_TAIL_PAGE_ID = 24
+			LAST_METADATA_PAGE_ID = 32
+			LAST_BASE_RID = 40
+			LAST_TAIL_ID = 48
 
 	BYTES_PER_INT = 8	
 

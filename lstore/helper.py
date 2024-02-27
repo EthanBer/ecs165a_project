@@ -1,4 +1,5 @@
 from __future__ import annotations
+from io import BufferedWriter
 import struct
 import typing
 from lstore.ColumnIndex import DataIndex, RawIndex
@@ -41,9 +42,18 @@ class helper:
 
 	# helper function to type cast list 
 	# https://www.geeksforgeeks.org/python-type-casting-whole-list-and-matrix/
-	# U = typing.TypeVar("U")
 	T = typing.TypeVar("T")
 	@staticmethod
 	def cast_list(test_list: list, data_type: T) -> list[T]:
 		return list(map(data_type, test_list)) # type: ignore[call-overload]
-     
+
+	U = typing.TypeVar("U")
+	@staticmethod
+	def not_null(value: U | None) -> U:
+		assert value is not None
+		return value
+
+	@staticmethod
+	def write_int(writer: BufferedWriter, integer: int) -> int:
+		writer.write(int.to_bytes(integer, config.BYTES_PER_INT, "big"))
+		return integer
