@@ -1,14 +1,15 @@
 from typing import Literal
 from lstore.ColumnIndex import DataIndex, RawIndex
-from lstore.file_handler import Table
-from lstore.page_directory_entry import PageDirectoryEntry
-from lstore.pseudo_buff_dict_value import Record
+from lstore.table import PageDirectoryEntry, Table, Record
 from lstore.index import Index
-from lstore.base_tail_page import BasePage, Page, TailPage
+from lstore.page import Page
+from lstore.base_tail_page import BasePage, TailPage
 import time
 from lstore.config import WriteSpecifiedMetadata, config
 from lstore.helper import helper
 import struct
+from lstore.page_range import PageRange
+from lstore.bufferpool import PsuedoBuffIntValue
 
 
 class Query:
@@ -322,56 +323,57 @@ class Query:
             if rid is not None:
                 # raise(Exception("select should not be called on a key that doesn't exist"))
                 valid_records.append(
-                    self.db_bpool.get_updated_record(self.table.name, rid, [1] * self.table.num_columns))
+                    self.db_bpool.get_version_record(self.table.name, rid, [1] * self.table.num_columns, relative_version))
         else:
             for rid in range(1, PsuedoBuffIntValue(self, "catalog", config.byte_position.CATALOG_LAST_RID).value()):
-                rec = self.db_bpool.get_updated_record(self.table.name, rid, [1] * self.table.num_columns)
+                rec = self.db_bpool.get_version_record(self.table.name, rid, [1] * self.table.num_columns, relative_version)
                 if rec.base_record == False:
                     continue
-                search_key_col = self.get_updated_col(rec, search_key_index)
+                search_key_col = self.db_bpool.get_version_col(self.table.name, rec, search_key_index, relative_version)
                 if search_key_col == search_key:
                     valid_records.append(rec)
                 #     valid_records.append(rid)
 
         for record in valid_records:
-            col_list = list(record.columns)
-            schema_encoding = record.schema_encoding
-            for i in range(len(col_list)):
-                if projected_columns_index[i] == 0:
-                    col_list[i] = None
-                else:
-                    if record.rid == None:
-                        continue
-                    else:
-                        if helper.ith_bit(schema_encoding, self.table.num_columns, i,
-                                          False) == 0b1:  # check if the column has been updated.
-                            # print("detected on schema encoding bit")
-                            assert record.indirection_column is not None, "inconsistent state: schema_encoding bit on but indirection was None"
-                            curr_rid = record.indirection_column
-                            curr_schema_encoding = self.db_bpool.get_updated_record(self.table.name, curr_rid, [
-                                1] * self.table.num_columns).schema_encoding
-                            counter = 0
-                            overversioned = False
-                            while counter > relative_version or helper.ith_bit(curr_schema_encoding,
-                                                                               self.table.num_columns, i, False) == 0b0:
-                                temp = self.db_bpool.get_updated_record(self.table.name, curr_rid,
-                                                                        [1] * self.table.num_columns)
-                                if temp is None:
-                                    overversioned = True
-                                    break
-                                assert temp.indirection_column is not None, "looped back to base record? indirection_column == None"
-                                curr_rid = temp.indirection_column
-                                curr_schema_encoding = self.db_bpool.get_updated_record(self.table.name, curr_rid, [
-                                    1] * self.table.num_columns).schema_encoding
-                                counter -= 1
-                                # curr_rid, curr_schema_encoding = temp.indirection_column, temp.schema_encoding
-                                # curr_indirection = temp
-                            if overversioned is True:
-                                curr_rid = record.indirection_column
-                            col_list[i] = self.table.self.db_bpool.get_updated_record(self.table.name, curr_rid,
-                                                                                      [1] * self.table.num_columns)[i]
-                    # rec.columns[i] = None  # filter out that column from the projection
-            record.columns = tuple(col_list)
+            # col_list = list(record.columns)
+            # schema_encoding = record.schema_encoding
+            # for i in range(len(col_list)):
+            #     if projected_columns_index[i] == 0:
+            #         col_list[i] = None
+            #     else:
+            #         if record.rid == None:
+            #             continue
+            #         else:
+            #             if helper.ith_bit(schema_encoding, self.table.num_columns, i,
+            #                               False) == 0b1:  # check if the column has been updated.
+            #                 # print("detected on schema encoding bit")
+            #                 assert record.indirection_column is not None, "inconsistent state: schema_encoding bit on but indirection was None"
+            #                 curr_rid = record.indirection_column
+            #                 curr_schema_encoding = self.db_bpool.get_updated_record(self.table.name, curr_rid, [
+            #                     1] * self.table.num_columns).schema_encoding
+            #                 counter = 0
+            #                 overversioned = False
+            #                 while counter > relative_version or helper.ith_bit(curr_schema_encoding,
+            #                                                                    self.table.num_columns, i, False) == 0b0:
+            #                     temp = self.db_bpool.get_updated_record(self.table.name, curr_rid,
+            #                                                             [1] * self.table.num_columns)
+            #                     if temp is None:
+            #                         overversioned = True
+            #                         break
+            #                     assert temp.indirection_column is not None, "looped back to base record? indirection_column == None"
+            #                     curr_rid = temp.indirection_column
+            #                     curr_schema_encoding = self.db_bpool.get_updated_record(self.table.name, curr_rid, [
+            #                         1] * self.table.num_columns).schema_encoding
+            #                     counter -= 1
+            #                     # curr_rid, curr_schema_encoding = temp.indirection_column, temp.schema_encoding
+            #                     # curr_indirection = temp
+            #                 if overversioned is True:
+            #                     curr_rid = record.indirection_column
+            #                 col_list[i] = self.table.self.db_bpool.get_updated_record(self.table.name, curr_rid,
+            #                                                                           [1] * self.table.num_columns)[i]
+            #         # rec.columns[i] = None  # filter out that column from the projection
+            curr_rid = record
+            record.columns = self.db_bpool.get_version_record(self.table.name, curr_rid,[1] * self.table.num_columns,relative_version)
             ret.append(record)
 
             # for i, column_value, data_index_indicator in enumerate(zip(rec.columns, projected_columns_index)):
