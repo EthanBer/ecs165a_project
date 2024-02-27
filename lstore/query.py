@@ -533,15 +533,28 @@ class Query:
                     #tmp_indirection_col = helper.unpack_col(page, config.INDIRECTION_COLUMN, offset)
                     # tmp_indirection_col = struct.unpack(config.PACKING_FORMAT_STR, page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]
             else: #deleting base record
-                base_dir_entry = self.table.page_directory_buff[base_record.metadata.rid]
+                #base_dir_entry = self.table.page_directory_buff[base_record.metadata.rid]
 
-                
-                base_dir_entry.page_id.update_nth_record(base_dir_entry.offset, config.NULL_COLUMN, bitmask)
+                self.db_bpool.delete_nth_record(self.table, base_record.metadata.base_rid, offset)# the other bits in the null column no longer matter because they are deleted
+                    
 
-        base_indirection = self.insert_tail(page_range, tail_indirection, tail_schema_encoding, *updated_columns)
+                #base_dir_entry.page_id.update_nth_record(base_dir_entry.offset, config.NULL_COLUMN, bitmask)
+
+        #base_indirection = self.insert_tail(page_range, tail_indirection, tail_schema_encoding, *updated_columns)
+        base_metadata = WriteSpecifiedMetadata(tail_indirection, tail_schema_encoding, null_bitmask)
+        base_indirection = self.db_bpool.insert_tail_record(self.table, base_metadata, *updated_columns)
+        
+
+
+
+
 
         success = base_page_dir_entry.page_id.update_nth_record(base_page_dir_entry.offset, config.INDIRECTION_COLUMN,
                                                                 base_indirection)
+        
+        
+        
+        
         assert success, "update not successful"
         base_schema_encoding = base_record.metadata.schema_encoding | tail_schema_encoding
         success = base_page_dir_entry.page_id.update_nth_record(base_page_dir_entry.offset,

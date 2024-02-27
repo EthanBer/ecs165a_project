@@ -906,11 +906,16 @@ class Bufferpool:
 
 	def delete_nth_record(self, table : Table, page_id: PageID, offset :int) -> bool:
 		bitmask = table.ith_total_col_shift(config.RID_COLUMN)
+		null_column_marked=False
+		rid_column_marked=False
 		for entry in self.entries:
-			if  entry != None and entry.physical_page_id == page_id and entry.physical_page_index == config.NULL_COLUMN:
-				entry[physical_page].data[offset:offset+8] = bitmask
-				return True
-		return False
+			if  entry != None and  entry.physical_page_id == page_id and entry.physical_page_index == config.NULL_COLUMN:
+				entry.physical_page.data[offset:offset+8] = bitmask
+				null_column_marked=True
+			if entry != None and entry.physical_page_id=page_id and entry.physical_page_index=config.RID_COLUMN:
+				entry.physical_page.data[offset:offset+8]=0b0 
+				rid_column_marked=True
+		return rid_column_marked & null_column_marked
 				
 				
 
