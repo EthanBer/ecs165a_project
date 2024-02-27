@@ -294,6 +294,55 @@ class Bufferpool:
 			desired_col = curr_record.get_value()[col_idx]
 		return desired_col 
 
+	def get_version_col(self, table_name: str, record: Record, col_idx: DataIndex, relative_version: int) -> int | None:
+		if record.metadata.rid == None:
+			return None # deleted record.
+		table: Table = next(table for table in self.tables if table.name == table_name)
+		desired_col: int | None = record[col_idx]
+		schema_encoding = record.metadata.schema_encoding
+		if helper.ith_bit(schema_encoding, table.num_columns, col_idx, False) == 0b1:
+			curr_rid = record.metadata.indirection_column
+			assert curr_rid is not None, "record rid wasn't none, so none of the indirections should be none either"
+			proj_col: List[Literal[0, 1]] = [0] * table.num_columns
+			proj_col[col_idx] = 1 # only get the desired column
+			record = self.get_record(table_name, curr_rid, proj_col)
+			curr_record = record
+			assert curr_record is not None, "a record with a non-None RID was not found"
+			curr_schema_encoding = curr_record.get_value().metadata.schema_encoding
+			counter = 0
+			overversioned = False
+			assert curr_record is not None, "a record with a non-None RID was not found"
+			curr_rid = curr_record.get_value().metadata.indirection_column
+			while counter > relative_version or helper.ith_bit(curr_schema_encoding, table.num_columns, col_idx, False) == 0b0: # while not found
+				assert curr_rid is not None
+				temp = self.get_record(table_name, curr_rid, proj_col)
+				if temp is None:
+					overversioned = True
+					break
+				assert curr_record is not None
+				curr_rid = temp.get_value().metadata.indirection_column
+				curr_record = self.get_record(table_name, curr_rid, proj_col)
+				curr_schema_encoding = curr_record.get_value().metadata.schema_encoding
+				counter -= 1
+			if overversioned is True:
+				curr_record = record
+			desired_col = curr_record.get_value()[col_idx]
+		return desired_col
+	def get_version_record(self, table_name: str, record_id: int, projected_columns_index: list[Literal[0] | Literal[1]], relative_version: int) -> Record | None:
+		# table: Table = next(table for table in self.tables if table.name == table_name)
+
+		# If there are multiple writers we probably need a lock here so the indirection column is not modified after we get it
+		buffered_record = self.get_record(table_name, record_id, projected_columns_index)
+		if buffered_record is None:
+			return None
+		columns: List[int | None] = []
+		for i in range(len(projected_columns_index)):
+			if projected_columns_index[i] == 1:
+				columns.append(self.get_version_col(table_name, buffered_record.get_value(), DataIndex(i), relative_version))
+			else:
+				columns.append(None)
+		version_record = Record(buffered_record.get_value().metadata, True, *columns)
+		return version_record
 
 	# THIS FUNCTION RECEIVES ONLY **BASE** RECORDS
 	def get_updated_record(self, table_name: str, record_id: int, projected_columns_index: list[Literal[0] | Literal[1]]) -> Record | None:
