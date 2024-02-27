@@ -13,7 +13,7 @@ class Record:
         self.metadata = metadata
         self.columns = columns
         # self.key = key
-        self.base_record = base_record
+        # self.base_record = base_record
 
     def __getitem__(self, key: int) -> int | None:
         # this syntax is used in the increment() function of query.py, so this operator should be implemented

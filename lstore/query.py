@@ -144,7 +144,7 @@ class Query:
         # the null column in this Metadata object won't be used by the page insert.
         # print(f"trying to insert")
         # print(f"trying to insert {columns}")
-        rid = self.table.file_handler.insert_record("base", WriteSpecifiedMetadata(None, 0b0, None),
+        rid = self.table.file_handler.insert_base_record("base", WriteSpecifiedMetadata(None, 0b0, None),
                                                                      *columns)
         # print(f"rid: {rid}")
 
@@ -391,15 +391,24 @@ class Query:
     # Returns True if update is succesful
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
+    """
+    def update(self,primary_key: int, *columns: int | None, **kwargs: bool) :
+        delete = kwargs.get("delete")
+        if delete is None:
+            delete = False
+        #check that the len(columns) is equal to the table 
+        #check primary key match 
+        primary_key_matches = self.select(primary_key, self.table.key_index, [1] * len(columns))
+    """
+
+
 
     # TODO: implement and uncomment
-    """
-    
     def update(self, primary_key: int, *columns: int | None, **kwargs: bool) -> bool:
         delete = kwargs.get("delete")
         if delete is None:
             delete = False
-
+        
         assert len(
             columns) == self.table.num_columns, f"len(columns) must be equal to number of columns in table; argument had length {len(columns)} but expected {self.table.num_columns} length, cols was {columns}"
         if len(columns) != self.table.num_columns:
@@ -415,7 +424,7 @@ class Query:
         # select indirection and rid columns
         base_record = primary_key_matches[0]
         base_page_dir_entry = self.table.page_directory_buff[helper.not_null(base_record.metadata.rid)]
-        page_range = base_page_dir_entry.page_range
+        #page_range = base_page_dir_entry.page_range
         # self.insert_tail(tail_page, )
 
         tail_1_values: list[int | None] = [None] * len(columns)
@@ -434,7 +443,7 @@ class Query:
                 updated_columns[i] = column
                 schema_shift = helper.ith_total_col_shift(self.table.num_columns, i, False)
                 # schema_shift = 1 << (self.table.num_columns - i - 1)
-                if helper.ith_bit(base_record.schema_encoding, self.table.num_columns, i, False) == 0b0:
+                if helper.ith_bit(base_record.metadata.schema_encoding, self.table.num_columns, i, False) == 0b0:
                     tail_1_values[i] = base_record.columns[i]
                     if not column_first_update:
                         column_first_update = True
@@ -448,16 +457,27 @@ class Query:
             # if not tail_page.has_capacity(2 if first_update else 1):
             #     tail_page = TailPage(page_range, page_range.num_columns)
             #     page_range.append_tail_page(tail_page)
+            
+            # Create the null bitmask      
+            null_bitmask = 0
+            for value in columns:
+                if value is None:
+                    null_bitmask |= 1
+                null_bitmask <<= 1
+            # Right shift by one to remove the extra shift from the last iteration
+            null_bitmask >>= 1
 
             if column_first_update:
-                tail_indirection = self.insert_tail(page_range, tail_1_indirection, tail_1_schema_encoding,
-                                                    *tail_1_values)
+                tail_1_metadata = WriteSpecifiedMetadata(tail_1_indirection, tail_1_schema_encoding, null_bitmask)
+                tail_indirection = self.db_bpool.insert_tail_record(self.table, tail_1_metadata, *tail_1_values)
+                
             else:
                 # if not column_first_update, at least one bit in the schema encoding had to be a 1
                 # in that case, we know the record should an indirection column, since it was updated
-                assert isinstance(base_record.indirection_column,
+                assert isinstance(base_record.metadata.indirection_column,
                                   int), f"inconsistent state: expected base record's indirection column to be an integer but instead got {type(base_record.indirection_column)}. columns was {columns}"
-                tail_indirection = base_record.indirection_column
+                tail_indirection = base_record.metadata.indirection_column
+            
                 # if last_update_rid:
                 #     last_update_page_dir_entry = self.table.page_directory[last_update_rid]
                 # se:
@@ -468,7 +488,6 @@ class Query:
                 # prev_schema_encoding = last_update_page_dir_entry["page"].get_nth_record(
                 #     last_update_page_dir_entry["offset"]).schema_encoding
                 # tail_schema_encoding |= prev_schema_encoding  # if first_update, these two should be the same. but if not then it might change
-
 
 
         else:
@@ -482,21 +501,26 @@ class Query:
             # # Append the packed bytes to the bytearray
             # page.physical_pages[config.NULL_COLUMN].data[offset*8:offset*8+8] = packed_data
             # indirection_column = struct.unpack('>Q', page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]
-            tmp_indirection_col: int | None = base_record.indirection_column
+            tmp_indirection_col: int | None = base_record.metadata.indirection_column
 
             if tmp_indirection_col is not None:
                 while True:
                     base_dir_entry = self.table.page_directory_buff[tmp_indirection_col]
-                    page = base_dir_entry.page_id
+                    page_id = base_dir_entry.page_id
                     offset = base_dir_entry.offset
 
                     # packed_data = struct.pack(config.PACKING_FORMAT_STR, bitmask)
                     # Append the packed bytes to the bytearray
-                    page.update_nth_record(offset, config.NULL_COLUMN,
-                                           bitmask)  # the other bits in the null column no longer matter because they are deleted
+
+
+                    
+                    self.db_bpool.update_nth_record(self.table, page_id, offset, config.NULL_COLUMN, bitmask)# the other bits in the null column no longer matter because they are deleted
                     page.update_nth_record(offset, config.RID_COLUMN, 0b0)  # set the RID to null
-                    if isinstance(page, BasePage):
+
+
+                    if base_dir_entry.page_type == "base":
                         break
+
                     # page.physical_pages[config.NULL_COLUMN].data[offset*8:offset*8+8] = packed_data
                     tmp_indirection_col = helper.unpack_col(page, config.INDIRECTION_COLUMN, offset)
                     # tmp_indirection_col = struct.unpack(config.PACKING_FORMAT_STR, page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]
@@ -546,7 +570,7 @@ class Query:
         #     if column is not None:
 
         # indirection of base = RID of tail
-    """
+    
 
     """
     :param start_range: int         # Start of the key range to aggregate 
