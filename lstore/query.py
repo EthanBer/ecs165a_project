@@ -317,6 +317,7 @@ class Query:
         # otherwise, locate the rid manually
         # ...get the updated value for this rid
         valid_records: list[Record] = []
+        
         if search_key_index == self.table.key_index:
             # print(search_key_index)
             # print(search_key)
@@ -403,7 +404,7 @@ class Query:
 
 
 
-    # TODO: implement and uncomment
+    
     def update(self, primary_key: int, *columns: int | None, **kwargs: bool) -> bool:
         delete = kwargs.get("delete")
         if delete is None:
@@ -475,7 +476,7 @@ class Query:
                 # if not column_first_update, at least one bit in the schema encoding had to be a 1
                 # in that case, we know the record should an indirection column, since it was updated
                 assert isinstance(base_record.metadata.indirection_column,
-                                  int), f"inconsistent state: expected base record's indirection column to be an integer but instead got {type(base_record.indirection_column)}. columns was {columns}"
+                                  int), f"inconsistent state: expected base record's indirection column to be an integer but instead got {type(base_record.metadata.indirection_column)}. columns was {columns}"
                 tail_indirection = base_record.metadata.indirection_column
             
                 # if last_update_rid:
@@ -492,7 +493,7 @@ class Query:
 
         else:
             tail_schema_encoding = 0b0
-            tail_indirection = base_record.rid
+            tail_indirection = base_record.metadata.base_rid
 
             # curr = tail_indirection
             bitmask = self.table.ith_total_col_shift(config.RID_COLUMN)
@@ -514,18 +515,27 @@ class Query:
 
 
                     
-                    self.db_bpool.update_nth_record(self.table, page_id, offset, config.NULL_COLUMN, bitmask)# the other bits in the null column no longer matter because they are deleted
-                    page.update_nth_record(offset, config.RID_COLUMN, 0b0)  # set the RID to null
-
-
+                    self.db_bpool.delete_nth_record(self.table, page_id, offset)# the other bits in the null column no longer matter because they are deleted
+                    #page.update_nth_record(offset, config.RID_COLUMN, 0b0)  # set the RID to null                    
+                    
                     if base_dir_entry.page_type == "base":
                         break
 
+                    current_buffer_record=self.db_bpool.get_record(self.table,tmp_indirection_col,[1]*self.table.num_columns)
+
+                    current_record=current_buffer_record.get_value()
+                    tmp_indirection_col=current_record.metadata.indirection_column
+                    
+                    
                     # page.physical_pages[config.NULL_COLUMN].data[offset*8:offset*8+8] = packed_data
-                    tmp_indirection_col = helper.unpack_col(page, config.INDIRECTION_COLUMN, offset)
+                    #tmp_indirection_col=helper.unpack_data(page.physical_pages[config.INDIRECTION_COLUMN].data, offset)
+
+                    #tmp_indirection_col = helper.unpack_col(page, config.INDIRECTION_COLUMN, offset)
                     # tmp_indirection_col = struct.unpack(config.PACKING_FORMAT_STR, page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]
-            else:
-                base_dir_entry = self.table.page_directory_buff[base_record.rid]
+            else: #deleting base record
+                base_dir_entry = self.table.page_directory_buff[base_record.metadata.rid]
+
+                
                 base_dir_entry.page_id.update_nth_record(base_dir_entry.offset, config.NULL_COLUMN, bitmask)
 
         base_indirection = self.insert_tail(page_range, tail_indirection, tail_schema_encoding, *updated_columns)
@@ -533,7 +543,7 @@ class Query:
         success = base_page_dir_entry.page_id.update_nth_record(base_page_dir_entry.offset, config.INDIRECTION_COLUMN,
                                                                 base_indirection)
         assert success, "update not successful"
-        base_schema_encoding = base_record.schema_encoding | tail_schema_encoding
+        base_schema_encoding = base_record.metadata.schema_encoding | tail_schema_encoding
         success = base_page_dir_entry.page_id.update_nth_record(base_page_dir_entry.offset,
                                                                 config.SCHEMA_ENCODING_COLUMN,
                                                                 base_schema_encoding)

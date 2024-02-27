@@ -904,10 +904,10 @@ class Bufferpool:
 			# self.pin_counts[new_buff_idx] = 0 # initialize to
 	
 
-	def delete_nth_record(self, table : Table, page_id: int, offset :int) -> bool:
+	def delete_nth_record(self, table : Table, page_id: PageID, offset :int) -> bool:
 		bitmask = table.ith_total_col_shift(config.RID_COLUMN)
 		for entry in self.entries:
-			if  entry != None and entry[physical_page_id] == page_id and entry[physical_page_index] == config.NULL_COLUMN:
+			if  entry != None and entry.physical_page_id == page_id and entry.physical_page_index == config.NULL_COLUMN:
 				entry[physical_page].data[offset:offset+8] = bitmask
 				return True
 		return False
