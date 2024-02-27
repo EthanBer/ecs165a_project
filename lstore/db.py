@@ -2,7 +2,7 @@ import glob
 import pickle
 from lstore import pseudo_buff_dict_value
 from lstore.ColumnIndex import DataIndex
-from lstore.base_tail_page import Page
+#from lstore.base_tail_page import Page
 from lstore.config import config
 from lstore.file_handler import Table
 from lstore.record_physical_page import PhysicalPage

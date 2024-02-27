@@ -9,7 +9,7 @@ from lstore.file_handler import FileHandler, Table
 from lstore.file_result_types import BufferpoolEntry, BufferpoolIndex, BufferpoolSearchResult
 from lstore.page_directory_entry import BasePageID, MetadataPageID, PageDirectoryEntry, PageID, TailPageID
 from lstore.ColumnIndex import DataIndex, RawIndex
-from lstore.base_tail_page import BasePage
+# from lstore.base_tail_page import BasePage
 from lstore.config import FullMetadata, WriteSpecifiedMetadata, config
 from lstore.helper import helper
 from lstore.record_physical_page import PhysicalPage, Record

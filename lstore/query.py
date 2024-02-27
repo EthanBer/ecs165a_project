@@ -2,9 +2,10 @@ from typing import Literal
 from lstore.ColumnIndex import DataIndex, RawIndex
 from lstore.file_handler import Table
 from lstore.page_directory_entry import PageDirectoryEntry
-from lstore.pseudo_buff_dict_value import Record
+#from lstore.pseudo_buff_dict_value import Record
+from lstore.record_physical_page import Record
 from lstore.index import Index
-from lstore.base_tail_page import BasePage, Page, TailPage
+#from lstore.base_tail_page import BasePage, Page, TailPage
 import time
 from lstore.config import WriteSpecifiedMetadata, config
 from lstore.helper import helper
