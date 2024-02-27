@@ -1,4 +1,5 @@
-from lstore.table import Table, Record
+from lstore.file_handler import Table
+from lstore.pseudo_buff_dict_value import Record
 from lstore.index import Index
 
 class TransactionWorker:
