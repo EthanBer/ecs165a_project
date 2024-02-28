@@ -890,25 +890,25 @@ class Table:
 class BufferedRecord:
 	def __del__(self) -> None:
 		self.bufferpool.change_pin_count(self.buff_indices, -1)
-	def __getattribute__(self, attr: str): # type: ignore[no-untyped-def]
-		if attr == "_contents":
-			raise(Exception("do NOT get the contents directly"))
-		super().__getattribute__(attr)
+	# def __getattribute__(self, attr: str): # type: ignore[no-untyped-def]
+	# 	if attr == "_contents":
+	# 		raise(Exception("do NOT get the contents directly"))
+	# 	super().__getattribute__(attr)
 	# value can actually have Any type here
-	def __setattr__(self, name: str, value) -> None: # type: ignore[no-untyped-def]
-		if name == "_contents" and self.initialized:
-			raise(Exception("buffered copies are read only"))
-		super().__setattr__(name, value)
+	# def __setattr__(self, name: str, value) -> None: # type: ignore[no-untyped-def]
+	# 	if name == "_contents" and self.initialized:
+	# 		raise(Exception("buffered copies are read only"))
+	# 	super().__setattr__(name, value)
 	def __init__(self, bufferpool: Bufferpool, table: Table, buff_indices: List[BufferpoolIndex], record_offset: int, record_id: int, projected_columns_index: List[Literal[0, 1]]):
-		self.initialized = False
+		# self.initialized = False
 		self.bufferpool = bufferpool
 		self.buff_indices = buff_indices # frame indices of base pages (including metadata and data)
-		self.bufferpool.change_pin_count(self.buff_indices, +1) # increment pin counts of relevant bufferpool frames
 		self.table = table
 		self.record_offset = record_offset
 		self.record_id = record_id
 		self.projected_columns_index = projected_columns_index
-		self.initialized = True
+		bufferpool.change_pin_count(buff_indices, +1) # increment pin counts of relevant bufferpool frames
+		# self.initialized = True
 
 	def add_buff_idx(self, buff_idx: BufferpoolIndex) -> None:
 		self.buff_indices.append(buff_idx)
@@ -1117,24 +1117,24 @@ class Bufferpool:
 		for i in [BufferpoolIndex(_) for _ in range(config.BUFFERPOOL_SIZE)]: # search the entire bufferpool for columns
 			if self.maybe_get_entry(i) is None:
 				continue
-			if self[i].physical_page_index == record_page_id:
+			if self[i].physical_page_id == record_page_id:
 				raw_idx = self[i].physical_page_index
 				assert raw_idx is not None, "non None in ids_of_physical_pages but None in index_of_physical_page_in_page?"
 				data_idx = raw_idx.toDataIndex()
 				if data_idx in requested_columns: # is a data column we requested?
 					#column_list[i] = self.buffered_physical_pages[i].data
 					# num_of_columns_found += 1
-					data_buff_indices.append(i)
-					raw_idx = self[i].physical_page_index
-					assert raw_idx is not None
-					data_idx = raw_idx.toDataIndex()
+					# data_buff_indices.append(i)
+					# raw_idx = self[i].physical_page_index
+					# assert raw_idx is not None
+					# data_idx = raw_idx.toDataIndex()
 					data_buff_indices[data_idx] = i
 				elif raw_idx in range(config.NUM_METADATA_COL):
-					metadata_buff_indices.append(i)
+					metadata_buff_indices[data_idx] = i
 				else: 
 					continue
 
-		found = (len([True for idx in data_buff_indices if idx == -1]) > 0) or (len([True for idx in metadata_buff_indices if idx == -1]) > 0)
+		found = (len([True for idx in data_buff_indices if idx == -1]) == 0) and (len([True for idx in metadata_buff_indices if idx == -1]) == 0)
 		return BufferpoolSearchResult(found, data_buff_indices, metadata_buff_indices, page_directory_entry.offset)
 
 
@@ -1217,6 +1217,7 @@ class Bufferpool:
 
 	def get_updated_col(self, table: Table, record: Record, col_idx: DataIndex) -> int | None:
 		if record.metadata.rid == None:
+			print("deleted record")
 			return None # deleted record.
 		# table: 'Table' = next(table for table in self.tables if table.name == table_name)
 		desired_col: int | None = record[col_idx]
@@ -1391,7 +1392,7 @@ class Bufferpool:
 		found, data_buff_indices, metadata_buff_indices, record_offset = t_2.found, t_2.data_buff_indices, t_2.metadata_buff_indices, t_2.record_offset
 		assert found, "record not found after bringing it into bufferpool"
 		assert record_offset is not None
-		filtered_data_buff_indices =  [idx for idx in data_buff_indices if (idx is not None) and (idx != -1) and (isinstance(idx, BufferpoolIndex)) ]
+		filtered_data_buff_indices =  [idx for idx in data_buff_indices if (idx != -1) and (isinstance(idx, BufferpoolIndex)) ]
 		filtered_metadata_buff_indices =  [idx for idx in metadata_buff_indices if (idx != -1) and (isinstance(idx, BufferpoolIndex)) ]
 		assert len(filtered_data_buff_indices) == len(data_buff_indices)
 		assert len(filtered_metadata_buff_indices) == len(metadata_buff_indices)

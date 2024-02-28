@@ -167,7 +167,7 @@ class Query:
         # otherwise, locate the rid manually
         # ...get the updated value for this rid
         valid_records: list[Record] = []
-        if search_key_index == self.table.key_index:  #
+        if False:  # search_key_index == self.table.key_index
             rid = self.table.index.locate(search_key_index, search_key)
             if rid is not None:
                 record = self.db_bpool.get_updated_record(self.table, rid, [1] * self.table.num_columns)
@@ -175,13 +175,15 @@ class Query:
                 valid_records.append(record)
                 # #print(f"record cols was {valid_records[0].columns}")
         else:
-            for rid in range(1, PsuedoBuffIntValue(self.table.file_handler, "catalog", config.byte_position.catalog.LAST_BASE_RID).value()):
+            last_base_rid_buff = PsuedoBuffIntValue(self.table.file_handler, "catalog", config.byte_position.catalog.LAST_BASE_RID)
+            for rid in range(1, last_base_rid_buff.value()):
                 record = self.db_bpool.get_updated_record(self.table, rid, [1] * self.table.num_columns)
                 assert record is not None
                 assert record.metadata.rid is not None
                 dir_entry = self.table.page_directory_buff[record.metadata.rid]
                 if dir_entry.page_type != "base":
                     continue
+                print(f"considering record {record.columns}")
                 # #print(f"record cols was {record.columns}")
                 # search_key_col: int | None = record[search_key_index]  # default to base page
                 # if rec[search_key_index] == search_key:
@@ -342,6 +344,8 @@ class Query:
             #                 col_list[i] = self.table.self.db_bpool.get_updated_record(self.table.name, curr_rid,
             #                                                                           [1] * self.table.num_columns)[i]
             #         # rec.columns[i] = None  # filter out that column from the projection
+            if record.metadata.rid is None:
+                continue
             curr_rid = helper.not_null(record.metadata.rid)
             record.columns = helper.not_null(self.db_bpool.get_version_record(self.table, curr_rid,[1] * self.table.num_columns,relative_version)).columns
             ret.append(record)
