@@ -1,5 +1,6 @@
 
 import os
+from random import randint, seed
 from lstore.config import config
 from lstore.db import Database
 from lstore.query import Query
@@ -14,7 +15,19 @@ grades_table = db.create_table('Grades', 5, 0)
 
 
 query = Query(grades_table)
-query.insert(*[1, 2, 3, 4, 5])
+number_of_records = 559	
+number_of_aggregates = 100
+records = {}
+seed(3562901)
+for i in range(0, number_of_records):
+    key = 92106429 + randint(0, number_of_records)
+
+    # skip duplicate keys
+    while key in records:
+        key = 92106429 + randint(0, number_of_records)
+
+    records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
+    query.insert(*records[key])
 db.close()
 
 # records = {}
