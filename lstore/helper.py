@@ -16,7 +16,7 @@ class helper:
 
 	@staticmethod
 	def unpack_data(data: bytearray, record_offset: int) -> int: 
-		# # print(f"data{data}", record_idx)
+		# # #print(f"data{data}", record_idx)
 		return int.from_bytes(data[record_offset:record_offset+8], byteorder="big")
 		# return struct.unpack(config.PACKING_FORMAT_STR, data[record_offset:record_offset+8])[0]
 	

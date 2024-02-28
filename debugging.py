@@ -37,8 +37,8 @@ for i in range(0, number_of_records):
 
     records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
     query.insert(*records[key])
-    # print('inserted', records[key])
-print("Insert finished")
+    # #print('inserted', records[key])
+#print("Insert finished")
 
 def check_with_select() -> None:
     # Check inserted records using select query
@@ -52,10 +52,10 @@ def check_with_select() -> None:
             if column != records[key][i]:
                 error = True
         if error:
-            print('select error on', key, ':', record, ', correct:', records[key])
+            #print('select error on', key, ':', record, ', correct:', records[key])
         else:
             pass
-            # print('select on', key, ':', record)
+            # #print('select on', key, ':', record)
 
 updated_records = {}
 def update() -> None:
@@ -79,10 +79,10 @@ def update() -> None:
             if column != records[key][j]:
                 error = True
         if error:
-            print('update error on', records[key], 'and', updated_columns, ':', record, ', correct:', records[key])
+            #print('update error on', records[key], 'and', updated_columns, ':', record, ', correct:', records[key])
         else:
             pass
-            # print('update on', original, 'and', updated_columns, ':', record)
+            # #print('update on', original, 'and', updated_columns, ':', record)
 
         # check version -2 for record
         record = query.select_version(key, 0, [1, 1, 1, 1, 1], -2)[0]
@@ -91,10 +91,10 @@ def update() -> None:
             if column != records[key][j]:
                 error = True
         if error:
-            print('update error on', records[key], 'and', updated_columns, ':', record, ', correct:', records[key])
+            #print('update error on', records[key], 'and', updated_columns, ':', record, ', correct:', records[key])
         else:
             pass
-            # print('update on', original, 'and', updated_columns, ':', record)
+            # #print('update on', original, 'and', updated_columns, ':', record)
 
         # check version 0 for record
         record = query.select_version(key, 0, [1, 1, 1, 1, 1], 0)[0]
@@ -103,37 +103,37 @@ def update() -> None:
             if column != updated_records[key][j]:
                 error = True
         if error:
-            print('update error on', records[key], 'and', updated_columns, ':', record, ', correct:', updated_records[key])
+            #print('update error on', records[key], 'and', updated_columns, ':', record, ', correct:', updated_records[key])
 
 def test_sum() -> None:
     keys = sorted(list(records.keys()))
     # aggregate on every column
     for c in sample(range(grades_table.num_columns), randint(0, 5)):
         for i in range(0, randint(1, number_of_aggregates)):
-        #  print('--')
-        #    print(list(records.keys()))
+        #  #print('--')
+        #    #print(list(records.keys()))
             r = sorted(sample(range(0, len(keys)), 2))
             # calculate the sum form test directory
             # version -1 sum
             column_sum = sum(map(lambda key: records[key][c], keys[r[0]: r[1] + 1]))
             result = query.sum_version(keys[r[0]], keys[r[1]], c, -1)
             if column_sum != result:
-                print('sum error on [', keys[r[0]], ',', keys[r[1]], ']: ', result, ', correct: ', column_sum)
+                #print('sum error on [', keys[r[0]], ',', keys[r[1]], ']: ', result, ', correct: ', column_sum)
             else:
                 pass
-                # print('sum on [', keys[r[0]], ',', keys[r[1]], ']: ', column_sum)
+                # #print('sum on [', keys[r[0]], ',', keys[r[1]], ']: ', column_sum)
             # version -2 sum
             column_sum = sum(map(lambda key: records[key][c], keys[r[0]: r[1] + 1]))
             result = query.sum_version(keys[r[0]], keys[r[1]], c, -2)
             if column_sum != result:
-                print('sum error on [', keys[r[0]], ',', keys[r[1]], ']: ', result, ', correct: ', column_sum)
+                #print('sum error on [', keys[r[0]], ',', keys[r[1]], ']: ', result, ', correct: ', column_sum)
             else:
                 pass
             # version 0 sum
             updated_column_sum = sum(map(lambda key: updated_records[key][c], keys[r[0]: r[1] + 1]))
             updated_result = query.sum_version(keys[r[0]], keys[r[1]], c, 0)
             if updated_column_sum != updated_result:
-                print('sum error on [', keys[r[0]], ',', keys[r[1]], ']: ', updated_result, ', correct: ',
+                #print('sum error on [', keys[r[0]], ',', keys[r[1]], ']: ', updated_result, ', correct: ',
                     updated_column_sum)
             else:
                 pass
@@ -146,30 +146,30 @@ test_sum()
 #     for i in range(len(db.tables)):
 #         table = db.tables[i]
 
-#         # print("Table Name: ", table.name)
-#         # print("Page Directory: ")
-#         # print(table.page_directory)
+#         # #print("Table Name: ", table.name)
+#         # #print("Page Directory: ")
+#         # #print(table.page_directory)
 
 #         for j in range(len(table.page_ranges)):
-#             # print("Current page range", j)
+#             # #print("Current page range", j)
 
 #             #Printing base pages of the current page_range
-#             # print("Base Pages:")
+#             # #print("Base Pages:")
 #             for k in range(len(table.page_ranges[j].base_pages)):
 #                 current_base_page = table.page_ranges[j].base_pages[k]
 
 #                 #Printing physical pages of the current base page
 #                 for l in range(len(current_base_page.physical_pages)):
-#                     # print(current_base_page.physical_pages[l].data)
+#                     # #print(current_base_page.physical_pages[l].data)
 
 
 #             #Printing tail pages of the current page_range
-#             # print("Tail Pages:")
+#             # #print("Tail Pages:")
 #             for k in range(len(table.page_ranges[j].tail_pages)):
 #                 current_tail_page = table.page_ranges[j].tail_pages[k]
 #                 #Printing physical pages of the current tail page
 #                 for l in range(len(current_tail_page.physical_pages)):
-#                     # print(current_tail_page.physical_pages[l].data)
+#                     # #print(current_tail_page.physical_pages[l].data)
 
 """
 if __name__ == "__main__":
@@ -201,11 +201,11 @@ if __name__ == "__main__":
 
         records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
         keys.append(key)
-        # print(f"inserting {records[key]}")
+        # #print(f"inserting {records[key]}")
         query.insert(*records[key])
-        # print(key, records)
-    # print("insert finished")
-    # print(db.tables[0].get_record_by_rid(1))
+        # #print(key, records)
+    # #print("insert finished")
+    # #print(db.tables[0].get_record_by_rid(1))
     # debugger_2(db)
 
 
@@ -225,28 +225,28 @@ for key in records:
     #     updated_columns[i] = value
     #     # update our test directory
     #     updated_records[key][i] = value
-    # # print(f"columns should be updated to {updated_columns}")
+    # # #print(f"columns should be updated to {updated_columns}")
     # query.update(key, *updated_columns)
-# print("update finished. records:")
-# print(updated_records)
+# #print("update finished. records:")
+# #print(updated_records)
 query.update(key, *[None, 78, None, None, None])
 query.update(key, *[None, None, 89, None, None])
-print(db.tables[0].get_record_by_rid(1))
-print(db.tables[0].get_record_by_rid(2))
-print(db.tables[0].get_record_by_rid(3))
-print(db.tables[0].get_record_by_rid(4))
-print(db.tables[0].get_record_by_rid(5))
+#print(db.tables[0].get_record_by_rid(1))
+#print(db.tables[0].get_record_by_rid(2))
+#print(db.tables[0].get_record_by_rid(3))
+#print(db.tables[0].get_record_by_rid(4))
+#print(db.tables[0].get_record_by_rid(5))
 
 
-print(helper.str_each_el(query.select(keys[0], DataIndex(0), [1] * 5)))
+#print(helper.str_each_el(query.select(keys[0], DataIndex(0), [1] * 5)))
 
 query.delete(keys[0])   # Delete last record inserted
-# # print(helper.str_each_el(query.select(keys[0], DataIndex(0), [1] * 5)))
-# # print(db.tables[0].get_record_by_rid(1))
-# print(db.tables[0].get_record_by_rid(6))
+# # #print(helper.str_each_el(query.select(keys[0], DataIndex(0), [1] * 5)))
+# # #print(db.tables[0].get_record_by_rid(1))
+# #print(db.tables[0].get_record_by_rid(6))
 # debugger_2(db)
-# # print(helper.str_each_el(query.select(keys[0], DataIndex(0), [1] * 5)))
-# # print(helper.str_each_el(query.select(keys[0], DataIndex(0), [0, 1, 0, 0, 0])))
+# # #print(helper.str_each_el(query.select(keys[0], DataIndex(0), [1] * 5)))
+# # #print(helper.str_each_el(query.select(keys[0], DataIndex(0), [0, 1, 0, 0, 0])))
     #
- # print(f"delete successful, key: {keys[0]}" if query.delete(keys[0]) else "delete failed")
+ # #print(f"delete successful, key: {keys[0]}" if query.delete(keys[0]) else "delete failed")
 """

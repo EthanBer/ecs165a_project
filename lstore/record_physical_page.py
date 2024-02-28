@@ -48,9 +48,6 @@ class PhysicalPage:
         self.data = data
         self.offset = offset
 
-    def has_capacity(self) -> bool:
-        return self.size > self.offset
-
     def insert(self, value: int | None) -> None:
         # Pack the 64-bit integer into bytes (using '>Q' format for unsigned long long with big endian)
         packed_data = struct.pack(config.PACKING_FORMAT_STR, 0 if value is None else value)
@@ -60,6 +57,10 @@ class PhysicalPage:
         # Append the packed bytes to the bytearray
         self.data[self.offset : self.offset+8] = packed_data
         self.offset += 8  
+    
+    def has_capacity(self, n: int = 1) -> bool:  # check capacity for n more records
+        return self.offset + (config.BYTES_PER_INT * n) <= config.PHYSICAL_PAGE_SIZE
+
 
     def __getitem__(self, val: slice) -> bytearray:
         return self.data[val.start:val.stop]
@@ -79,8 +80,8 @@ class PhysicalPage:
     #     value = helper.unpack_data(self.data, record_idx)
 
     #     if (value != 0):
-    #         ## print("Value: ", value, "Index: ", record_idx)
-    #         # # print("num records: ", num_records) # print("offset: ", self.offset)
+    #         ## #print("Value: ", value, "Index: ", record_idx)
+    #         # # #print("num records: ", num_records) # #print("offset: ", self.offset)
     #         pass
 
     #     return value

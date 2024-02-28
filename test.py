@@ -17,9 +17,9 @@ from lstore.ColumnIndex import DataIndex, RawIndex
 
 
 def debugger_2(db: Database) -> None:
-    # print("DATABASE: ")
+    # #print("DATABASE: ")
     for table in db.tables:
-        # print(table)
+        # #print(table)
 db = Database()
 grades_table = db.create_table('Grades', 5, DataIndex(0))
 # create a query class for the grades table
@@ -42,9 +42,9 @@ for i in range(0, number_of_records):
     records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
     keys.append(key)
     query.insert(*records[key])
-    # print(key, records)
-# print("insert finished")
-# print(db.tables[0].get_record_by_rid(1))
+    # #print(key, records)
+# #print("insert finished")
+# #print(db.tables[0].get_record_by_rid(1))
 
 
 query.delete(key)   # Delete last record inserted

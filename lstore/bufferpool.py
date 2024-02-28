@@ -62,23 +62,28 @@ class PsuedoBuffIntValue:
 		self.file_handler = file_handler
 		self.byte_positions = [byte_position]
 		self._value = file_handler.read_int_value(page_sub_path, byte_position)
-		print(f"INITIING TO {self._value} and {self.page_paths}")
+		#print(f"INITIING TO {self._value} and {self.page_paths}")
 		# self._value = file_handler.read_value(page_sub_path, byte_position, "int")
 	def flush(self) -> None:
 		if self.dirty:
 			for i in range(len(self.page_paths)):
 				self.file_handler.write_position(self.page_paths[i], self.byte_positions[i], self._value)
 		self.flushed = True
-		print(f"FLUSHED {self._value} in {self.page_paths}")
+		#print(f"FLUSHED {self._value} in {self.page_paths}")
 	def value(self, increment: int=0) -> int:
 		val = self._value
 		if self.flushed:
 			raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
 		if increment != 0:
 			self._value += increment 
+			#print("incremented thing")
 			self.dirty = True
-		print(f"value {val} accessed with increment {increment}, with page_paths = {self.page_paths}")
+		#print(f"value {val} accessed with increment {increment}, with page_paths = {self.page_paths} and offset = {self.byte_positions}")
 		return val
+	def value_assign(self, new_value: int) -> None:
+		self._value = new_value
+		self.dirty = True
+
 
 	# will flush the value to memory to THIS location also. 
 	def add_flush_location(self, page_sub_path: PageID | Literal["catalog"], byte_position: int) -> None:
@@ -87,8 +92,8 @@ class PsuedoBuffIntValue:
 
 	def __del__(self) -> None: # ensure that the value was flushed, if it was dirty
 		if not self.flushed and self.dirty:
-			# print(self.page_path, self._value, self.byte_position)
-			print(f"ERROR IN  {self._value} in {self.page_paths}")
+			# #print(self.page_path, self._value, self.byte_position)
+			#print(f"ERROR IN  {self._value} in {self.page_paths}")
 			raise(Exception("unflushed int buffer value"))
 		# self.flush()
 
@@ -237,10 +242,12 @@ class FileHandler:
 		# t_tail = self.read_projected_cols_of_page(TailPageID(self.next_base_page_id.value() - 1))
 		# if t_tail is None:
 		# 	raise(Exception("the tail_page_id just before the next_page_id must have a folder."))
-		page = self.read_full_page(BasePageID(self.next_base_page_id.value() - 1))
+		base_page = self.read_full_page(BasePageID(self.next_base_page_id.value() - 1))
+		tail_page = self.read_full_page(TailPageID(self.next_tail_page_id.value() - 1))
 		
-		self.page_to_commit: Annotated[list[PhysicalPage], self.table.total_columns] = page.metadata_physical_pages + page.data_physical_pages
-		print("SEET table_path to" + self.table_path)
+		self.base_page_to_commit: Annotated[list[PhysicalPage], self.table.total_columns] = base_page.metadata_physical_pages + base_page.data_physical_pages
+		self.tail_page_to_commit: Annotated[list[PhysicalPage], self.table.total_columns] = tail_page.metadata_physical_pages + tail_page.data_physical_pages
+		#print("SEET table_path to" + self.table_path)
 		# check that physical page sizes and offsets are the same
 		# assert len(
 		# 	set(map(lambda physicalPage: physicalPage.size, self.page_to_commit))) <= 1
@@ -304,12 +311,12 @@ class FileHandler:
 	def write_new_tail_page(self) -> bool:
 			# check that physical page sizes and offsets are the same
 		assert len(
-			set(map(lambda physicalPage: physicalPage.size, self.page_to_commit))) <= 1
+			set(map(lambda physicalPage: physicalPage.size, self.tail_page_to_commit))) <= 1
 		assert len(
-			set(map(lambda physicalPage: physicalPage.offset, self.page_to_commit))) <= 1
+			set(map(lambda physicalPage: physicalPage.offset, self.tail_page_to_commit))) <= 1
 		
 		# STEP 1. get offset for this page. increment offset to the end
-		offset_to_write = self.page_to_commit[0].offset # amount of bytes to write
+		offset_to_write = self.tail_page_to_commit[0].offset # amount of bytes to write
 		curr_offset = self.tail_offset.value()
 		# if we can fit all of the remaining physical page data into this page, then only increment
 		# by that value. otherwise, set the offset value to config.PHYSICAL_PAGE_SIZE
@@ -325,7 +332,7 @@ class FileHandler:
 			old_metadata_file.seek(8)
 			for i in range(0, config.NUM_METADATA_COL):
 				old_metadata_file.seek(curr_offset, 1) # skip over already written stuff
-				old_metadata_file.write(self.page_to_commit[i][0:offset_written]) 
+				old_metadata_file.write(self.base_page_to_commit[i][0:offset_written]) 
 		old_metadata_file.close()
 
 		p_tail_1 = self.tail_path(TailPageID(self.next_tail_page_id.value() - 1))
@@ -333,7 +340,7 @@ class FileHandler:
 			old_tail_file.seek(24)
 			for i in range(config.NUM_METADATA_COL, self.table.total_columns):
 				old_tail_file.seek(curr_offset, 1) # skip over already written stuff
-				old_tail_file.write(self.page_to_commit[i][0:offset_written])
+				old_tail_file.write(self.base_page_to_commit[i][0:offset_written])
 		old_tail_file.close()
 
 
@@ -352,21 +359,19 @@ class FileHandler:
 			new_metadata_file.seek(8)
 			for i in range(0, config.NUM_METADATA_COL):
 				# the order is swapped because we are adding a new page rather than adding to a page
-				new_metadata_file.write(self.page_to_commit[i][offset_written:]) # config.PHYSICAL_PAGE_SIZE - offset_written
+				new_metadata_file.write(self.tail_page_to_commit[i][offset_written:]) # config.PHYSICAL_PAGE_SIZE - offset_written
 				new_metadata_file.seek(offset_written, 1) 
 		new_metadata_file.close()
 
 		with open(written_tail_page_path, "r+b") as file: # open new page file
 			file.seek(24)
-			for i in range(config.NUM_METADATA_COL, len(self.page_to_commit)): # write the data columns
-				file.write(self.page_to_commit[i][offset_written:])
+			for i in range(config.NUM_METADATA_COL, len(self.tail_page_to_commit)): # write the data columns
+				file.write(self.tail_page_to_commit[i][offset_written:])
 				file.seek(offset_written, 1)
 		file.close()
 
-		self.page_to_commit = [PhysicalPage()] * self.table.total_columns
+		self.tail_page_to_commit = [PhysicalPage()] * self.table.total_columns
 		return True
-
-
 
 
 	# should only be "base" or "tail" path_type
@@ -375,12 +380,12 @@ class FileHandler:
 
 		# check that physical page sizes and offsets are the same
 		assert len(
-			set(map(lambda physicalPage: physicalPage.size, self.page_to_commit))) <= 1
+			set(map(lambda physicalPage: physicalPage.size, self.base_page_to_commit))) <= 1
 		assert len(
-			set(map(lambda physicalPage: physicalPage.offset, self.page_to_commit))) <= 1
+			set(map(lambda physicalPage: physicalPage.offset, self.base_page_to_commit))) <= 1
 		
 		# STEP 1. get offset for this page. increment offset to the end
-		offset_to_write = self.page_to_commit[0].offset # amount of bytes to write
+		offset_to_write = self.base_page_to_commit[0].offset # amount of bytes to write
 		curr_offset = self.base_offset.value()
 		# if we can fit all of the remaining physical page data into this page, then only increment
 		# by that value. otherwise, set the offset value to config.PHYSICAL_PAGE_SIZE
@@ -396,7 +401,7 @@ class FileHandler:
 			old_metadata_file.seek(8)
 			for i in range(0, config.NUM_METADATA_COL):
 				old_metadata_file.seek(curr_offset, 1) # skip over already written stuff
-				old_metadata_file.write(self.page_to_commit[i][0:offset_written]) 
+				old_metadata_file.write(self.base_page_to_commit[i][0:offset_written]) 
 		old_metadata_file.close()
 
 		p_base_1 = self.base_path(BasePageID(self.next_base_page_id.value() - 1))
@@ -404,7 +409,7 @@ class FileHandler:
 			old_base_file.seek(24)
 			for i in range(config.NUM_METADATA_COL, self.table.total_columns):
 				old_base_file.seek(curr_offset, 1) # skip over already written stuff
-				old_base_file.write(self.page_to_commit[i][0:offset_written])
+				old_base_file.write(self.base_page_to_commit[i][0:offset_written])
 		old_base_file.close()
 
 
@@ -423,18 +428,21 @@ class FileHandler:
 			new_metadata_file.seek(8)
 			for i in range(0, config.NUM_METADATA_COL):
 				# the order is swapped because we are adding a new page rather than adding to a page
-				new_metadata_file.write(self.page_to_commit[i][offset_written:]) # config.PHYSICAL_PAGE_SIZE - offset_written
+				new_metadata_file.write(self.base_page_to_commit[i][offset_written:]) # config.PHYSICAL_PAGE_SIZE - offset_written
 				new_metadata_file.seek(offset_written, 1) 
 		new_metadata_file.close()
 
 		with open(written_base_page_path, "r+b") as file: # open new page file
 			file.seek(24)
-			for i in range(config.NUM_METADATA_COL, len(self.page_to_commit)): # write the data columns
-				file.write(self.page_to_commit[i][offset_written:])
+			for i in range(config.NUM_METADATA_COL, len(self.base_page_to_commit)): # write the data columns
+				file.write(self.base_page_to_commit[i][offset_written:])
 				file.seek(offset_written, 1)
 		file.close()
 
-		self.page_to_commit = [PhysicalPage()] * self.table.total_columns
+		self.base_page_to_commit = []
+		for i in range(self.table.total_columns):
+			self.base_page_to_commit.append(PhysicalPage(data=bytearray(config.PHYSICAL_PAGE_SIZE), offset=0))
+		self.base_offset.value_assign(0)
 		return True
 
 	def read_value_page_directory(self) -> dict[int, 'PageDirectoryEntry']:
@@ -552,8 +560,8 @@ class FileHandler:
 		list_columns.insert(config.NULL_COLUMN, metadata.null_column)
 		list_columns.insert(config.BASE_RID, rid)
 		cols = tuple(list_columns)
-		for i in range(len(self.page_to_commit)):
-			physical_page = self.page_to_commit[i]	
+		for i in range(len(self.tail_page_to_commit)):
+			physical_page = self.tail_page_to_commit[i]	
 			if physical_page is not None:
 				if not physical_page.has_capacity():
 					self.write_new_tail_page()
@@ -561,7 +569,7 @@ class FileHandler:
 					physical_page.insert(cols[i])
 			self.tail_offset.value(config.BYTES_PER_INT)
 		pg_dir_entry: 'PageDirectoryEntry'
-		pg_dir_entry = PageDirectoryEntry(TailPageID(self.next_base_page_id.value()), TailMetadataPageID(self.next_tail_metadata_page_id.value()), self.tail_offset.value(), "tail")
+		pg_dir_entry = PageDirectoryEntry(TailPageID(self.next_tail_page_id.value()), TailMetadataPageID(self.next_tail_metadata_page_id.value()), self.tail_offset.value(), "tail")
 		self.table.page_directory_buff.value_assign(rid, pg_dir_entry)
 		
 		return rid
@@ -570,23 +578,27 @@ class FileHandler:
 
 
 	def insert_base_record(self, metadata: WriteSpecifiedMetadata, *columns: int | None) -> int: # returns RID of inserted record
+		assert len(
+			set(map(lambda physicalPage: physicalPage.size, self.base_page_to_commit))) <= 1
+		assert len(
+			set(map(lambda physicalPage: physicalPage.offset, self.base_page_to_commit))) <= 1
 		null_bitmask = 0
 		total_cols = self.table.total_columns
 		if metadata.indirection_column == None: # set 1 for null indirection column
-			# print("setting indirection null bit")
+			# #print("setting indirection null bit")
 			null_bitmask = helper.ith_total_col_shift(total_cols, config.INDIRECTION_COLUMN)
 			# null_bitmask = 1 << (total_cols - 1)
 		for idx, column in enumerate(columns):
-			# print(f"checking cols for null... {column}")
+			# #print(f"checking cols for null... {column}")
 			if column is None:
-				# print("found a null col")
+				# #print("found a null col")
 				null_bitmask = null_bitmask | helper.ith_total_col_shift(len(columns), idx, False) #
 				# null_bitmask = null_bitmask | (1 << (len(columns)-idx-1))
 			
-		# print(f"inserting null bitmask {bin(null_bitmask)}")
+		# #print(f"inserting null bitmask {bin(null_bitmask)}")
 		
 		# Transform columns to a list to append the schema encoding and the indirection column
-		# print(columns)
+		# #print(columns)
 		list_columns: list[int | None] = list(columns)
 		rid = self.next_base_rid.value(1)
 		list_columns.insert(config.INDIRECTION_COLUMN, metadata.indirection_column)
@@ -596,14 +608,15 @@ class FileHandler:
 		list_columns.insert(config.NULL_COLUMN, null_bitmask)
 		list_columns.insert(config.BASE_RID, rid)
 		cols = tuple(list_columns)
-		for i in range(len(self.page_to_commit)):
-			physical_page = self.page_to_commit[i]	
+		for i in range(len(self.base_page_to_commit)):
+			physical_page = self.base_page_to_commit[i]	
 			if physical_page is not None:
-				if physical_page.has_capacity():
-					physical_page.insert(cols[i])
-				else:
-					self.write_new_base_page()
+				physical_page.insert(cols[i])
+		#print(f"before: {self.base_offset.value()}")
 		self.base_offset.value(config.BYTES_PER_INT)
+		#print(f"after: {self.base_offset.value()}")
+		#print(f"physical_page_offset = {physical_page.offset} ..--.. base_offset = {self.base_offset.value()}")
+		assert self.base_page_to_commit[0].offset == self.base_offset.value(), f"physical_page_offset = {physical_page.offset} but base_offset = {self.base_offset.value()}"
 		if self.base_offset.value() == config.PHYSICAL_PAGE_SIZE:
 			self.write_new_base_page()	
 		pg_dir_entry = PageDirectoryEntry(BasePageID(self.next_base_page_id.value()), BaseMetadataPageID(self.next_base_metadata_page_id.value()), self.base_offset.value(), "base")
@@ -639,7 +652,7 @@ class FileHandler:
 		index_file.close()
 
 	def initialize_base_tail_page(self, page_id: BasePageID | TailPageID, metadata_id: BaseMetadataPageID | TailMetadataPageID) -> None:
-		print(f"initializing page id {page_id} of type {type(page_id)}")
+		#print(f"initializing page id {page_id} of type {type(page_id)}")
 		page_path = self.page_id_to_path(page_id)
 		open(page_path, "xb") # create the file
 		with open(page_path, "w+b") as base_file:
@@ -672,12 +685,13 @@ class FileHandler:
 		self.tail_offset.flush()
 
 	def __del__(self) -> None:
+		pass
 		# self.flush()
-		print(f"DELETING FILE HANDLER PATH {self.table_path}")
-
+		#print(f"DELETING FILE HANDLER PATH {self.table_path}")
 
 
 PageDirectory = dict[int, PageDirectoryEntry]
+
 class Table:
 	"""
 	:param name: string         #Table name
@@ -711,8 +725,9 @@ class Table:
 		self.index.create_index(self.key_index)
 
 	def __del__(self) -> None:
+		pass
 		# self.file_handler.flush()
-		print(f"deleting TABLE {self.name}")
+		#print(f"deleting TABLE {self.name}")
 
 
 
@@ -746,7 +761,7 @@ class Table:
 
 	# def _update_record_by_id()
 	# def __merge(self):
-	#     print("merge is happening")
+	#     #print("merge is happening")
 	#     pass
 
 	# TODO: uncomment
@@ -925,7 +940,7 @@ class BufferedRecord:
 			# val = all_cols[col_idx][record_offset]
 			# val = int.from_bytes(all_cols[col_idx].data[record_offset:record_offset+config.BYTES_PER_INT], byteorder="big")
 			val = get_no_none_check(col_idx, record_offset)
-			# # print("getting checking null")
+			# # #print("getting checking null")
 			if val == 0:
 				# breaking an abstraction barrier for convenience right now. TODO: fix?
 				thing = helper.unpack_data(all_cols[config.NULL_COLUMN].data, record_offset)
@@ -992,7 +1007,7 @@ class Bufferpool:
 		self.path = path
 		self.curr_clock_hand = 0
 	
-	def get_item(self, key: int, allowed_none = False) -> BufferpoolEntry | None:
+	def get_item(self, key: int, allowed_none: bool = False) -> BufferpoolEntry | None:
 		entry = self.entries[key]
 		return entry
 
@@ -1001,6 +1016,9 @@ class Bufferpool:
 		entry = self.entries[key]
 		assert entry is not None, "tried to get a BufferpoolEntry but it was none (and allow_none was set to its default, False)" 
 		return entry
+	
+	def maybe_get_entry(self, key: int) -> BufferpoolEntry | None:
+		return self.entries[key]
 	
 	def __setitem__(self, key: int, item: BufferpoolEntry | None) -> None:
 		self.entries[key] = item
@@ -1097,7 +1115,7 @@ class Bufferpool:
 		#column_list = [None] * len(projected_columns_index)
 		
 		for i in [BufferpoolIndex(_) for _ in range(config.BUFFERPOOL_SIZE)]: # search the entire bufferpool for columns
-			if self.get_item == None:
+			if self.maybe_get_entry(i) is None:
 				continue
 			if self[i].physical_page_index == record_page_id:
 				raw_idx = self[i].physical_page_index
@@ -1384,26 +1402,28 @@ class Bufferpool:
 
 	# returns buffer index of evicted physical page. 
 	# does not evict anything in the `save` array.
-	def evict_physical_page_clock(self, save: List[BufferpoolIndex] = []) -> BufferpoolIndex | None: 
+	def evict_physical_page_clock(self) -> BufferpoolIndex | None: 
 		start_hand = self.curr_clock_hand % config.BUFFERPOOL_SIZE
 		def curr_hand() -> BufferpoolIndex:
 			return BufferpoolIndex(self.curr_clock_hand % config.BUFFERPOOL_SIZE)
+		self.curr_clock_hand += 1
 		while curr_hand() != start_hand:
 			i = curr_hand()
-			if not i in save:
-				if self[i].pin_count == 0:
-					if self[i].dirty_bit == 1: 
-						self.write_to_disk(self[i].table, i)
-					self.remove_from_bufferpool(i) # remove from the buffer without writing in disk
-					return i
+			if self.maybe_get_entry(i) is None:
+				return i
+			if self[i].pin_count == 0:
+				if self[i].dirty_bit == 1: 
+					self.write_to_disk(self[i].table, i)
+				self.remove_from_bufferpool(i) # remove from the buffer without writing in disk
+				return i
 			self.curr_clock_hand += 1
 		return None
 
 	# NOTE: just pin the indices you want to keep rather than populating the save array... 
-	def evict_n_slots(self, n: int, save: List[BufferpoolIndex] = []) -> List[BufferpoolIndex] | None: # returns buffer indices freed, or None if not all slots could be evicted
+	def evict_n_slots(self, n: int) -> List[BufferpoolIndex] | None: # returns buffer indices freed, or None if not all slots could be evicted
 		evicted_buff_idx: list[BufferpoolIndex] = []
 		for _ in range(n):
-			evicted = self.evict_physical_page_clock(save)
+			evicted = self.evict_physical_page_clock()
 			if evicted is None:
 				return None
 			evicted_buff_idx.append(evicted)
