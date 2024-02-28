@@ -15,7 +15,7 @@ grades_table = db.create_table('Grades', 5, 0)
 
 
 query = Query(grades_table)
-number_of_records = 1000
+number_of_records = 2982
 number_of_aggregates = 100
 records = {}
 seed(3562901)
@@ -30,20 +30,21 @@ for i in range(0, number_of_records):
 	#print(records[key])
 	query.insert(*records[key])
 
-for key in records:
-    # select function will return array of records
-    # here we are sure that there is only one record in t hat array
-    # check for retreiving version -1. Should retreive version 0 since only one version exists.
-    record = query.select(key, 0, [1, 1, 1, 1, 1])[0]
-    error = False
-    for i, column in enumerate(record.columns):
-        if column != records[key][i]:
-            error = True
-    if error:
-        print('select error on', key, ':', record.columns, ', correct:', records[key])
-    else:
-        pass
-        # print('select on', key, ':', record)
+# for key in records:
+#     # select function will return array of records
+#     # here we are sure that there is only one record in t hat array
+#     # check for retreiving version -1. Should retreive version 0 since only one version exists.
+# 	s = query.select(key, 0, [1, 1, 1, 1, 1])
+# 	record = s[0]
+# 	error = False
+# 	for i, column in enumerate(record.columns):
+# 		if column != records[key][i]:
+# 			error = True
+# 	if error:
+# 		print('select error on', key, ':', record.columns, ', correct:', records[key])
+# 	else:
+# 		pass
+# 		# print('select on', key, ':', record)
 db.close()
 
 # records = {}

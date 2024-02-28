@@ -396,20 +396,20 @@ class FileHandler:
 
 		# STEP 2. write whatever we can into this page, both metadata and base
 		p_metadata_1 = self.metadata_path(BaseMetadataPageID(self.next_base_metadata_page_id.value() - 1))
-		offset_written = config.PHYSICAL_PAGE_SIZE - curr_offset
+		offset_skip = config.PHYSICAL_PAGE_SIZE - curr_offset
 		with open(p_metadata_1, "r+b") as old_metadata_file:
 			old_metadata_file.seek(8)
 			for i in range(0, config.NUM_METADATA_COL):
-				old_metadata_file.seek(curr_offset, 1) # skip over already written stuff
-				old_metadata_file.write(self.base_page_to_commit[i][0:offset_written]) 
+				old_metadata_file.write(self.base_page_to_commit[i][0:curr_offset]) 
+				old_metadata_file.seek(offset_skip, 1) # skip over already written stuff
 		old_metadata_file.close()
 
 		p_base_1 = self.base_path(BasePageID(self.next_base_page_id.value() - 1))
 		with open(p_base_1, "r+b") as old_base_file:
 			old_base_file.seek(24)
 			for i in range(config.NUM_METADATA_COL, self.table.total_columns):
-				old_base_file.seek(curr_offset, 1) # skip over already written stuff
-				old_base_file.write(self.base_page_to_commit[i][0:offset_written])
+				old_base_file.write(self.base_page_to_commit[i][0:curr_offset])
+				old_base_file.seek(offset_skip, 1) # skip over already written stuff
 		old_base_file.close()
 
 
@@ -424,20 +424,20 @@ class FileHandler:
 		self.base_offset.add_flush_location(metadata_pointer, config.byte_position.metadata.OFFSET)
 
 
-		with open(self.metadata_path(metadata_pointer), "r+b") as new_metadata_file: # open new metadata file
-			new_metadata_file.seek(8)
-			for i in range(0, config.NUM_METADATA_COL):
-				# the order is swapped because we are adding a new page rather than adding to a page
-				new_metadata_file.write(self.base_page_to_commit[i][offset_written:]) # config.PHYSICAL_PAGE_SIZE - offset_written
-				new_metadata_file.seek(offset_written, 1) 
-		new_metadata_file.close()
+		# with open(self.metadata_path(metadata_pointer), "r+b") as new_metadata_file: # open new metadata file
+		# 	new_metadata_file.seek(8)
+		# 	for i in range(0, config.NUM_METADATA_COL):
+		# 		# the order is swapped because we are adding a new page rather than adding to a page
+		# 		new_metadata_file.seek(curr_offset, 1) 
+		# 		new_metadata_file.write(self.base_page_to_commit[i][curr_offset:]) # config.PHYSICAL_PAGE_SIZE - offset_written
+		# new_metadata_file.close()
 
-		with open(written_base_page_path, "r+b") as file: # open new page file
-			file.seek(24)
-			for i in range(config.NUM_METADATA_COL, len(self.base_page_to_commit)): # write the data columns
-				file.write(self.base_page_to_commit[i][offset_written:])
-				file.seek(offset_written, 1)
-		file.close()
+		# with open(written_base_page_path, "r+b") as file: # open new page file
+		# 	file.seek(24)
+		# 	for i in range(config.NUM_METADATA_COL, len(self.base_page_to_commit)): # write the data columns
+		# 		file.seek(offset_written, 1)
+		# 		file.write(self.base_page_to_commit[i][offset_written:])
+		# file.close()
 
 		self.base_page_to_commit = []
 		for i in range(self.table.total_columns):
@@ -983,7 +983,7 @@ class BufferedRecord:
 		elif page_type == "metadata":
 			raise(Exception("should not be getting metadata page type in get_record."))
 
-		return Record(FullMetadata(indirection_column, timestamp, indirection_column,schema_encoding, null_col, base_rid), is_base_page, *[helper.unpack_data(data_col.data, self.record_offset) for data_col in data_cols])
+		return Record(FullMetadata(rid, timestamp, indirection_column,schema_encoding, null_col, base_rid), is_base_page, *[helper.unpack_data(data_col.data, self.record_offset) for data_col in data_cols])
 				
 
 # class BufferpoolList(list):

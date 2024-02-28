@@ -175,11 +175,11 @@ class Query:
                 valid_records.append(record)
                 # #print(f"record cols was {valid_records[0].columns}")
         else:
-            last_base_rid_buff = PsuedoBuffIntValue(self.table.file_handler, "catalog", config.byte_position.catalog.LAST_BASE_RID)
+            last_base_rid_buff = self.table.file_handler.next_base_rid
             for rid in range(1, last_base_rid_buff.value()):
                 record = self.db_bpool.get_updated_record(self.table, rid, [1] * self.table.num_columns)
                 assert record is not None
-                assert record.metadata.rid is not None
+                assert record.metadata.rid == rid
                 dir_entry = self.table.page_directory_buff[record.metadata.rid]
                 if dir_entry.page_type != "base":
                     continue
@@ -196,6 +196,7 @@ class Query:
                 # DO WE NEED THIS?? BECAUSE WE DID get_updated_record we can assume that this is also updated
                 # search_key_col = self.get_updated_col(record, search_key_index)
                 search_key_col = self.db_bpool.get_updated_col(self.table, record, DataIndex(search_key_index))
+                print(search_key_col)
 
                 # schema_encoding = record.schema_encoding
                 # if helper.ith_bit(schema_encoding, self.table.num_columns, search_key_index,
