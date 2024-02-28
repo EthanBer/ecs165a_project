@@ -410,6 +410,8 @@ class Query:
 
 
     
+    # TODO finish
+    """
     def update(self, primary_key: int, *columns: int | None, **kwargs: bool) -> bool:
         delete = kwargs.get("delete")
         if delete is None:
@@ -565,6 +567,7 @@ class Query:
         assert success, "update not successful"
         
         return success
+    """
 
         # tail_1_indirection = rid if first_update else last_update_rid
 

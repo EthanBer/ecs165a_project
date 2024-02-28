@@ -61,12 +61,14 @@ class PsuedoBuffIntValue:
 		self._value = file_handler.read_int_value(page_sub_path, byte_position)
 		self.flushed = False
 		self.dirty = False
+		print(f"INITIING TO {self._value} and {self.page_paths}")
 		# self._value = file_handler.read_value(page_sub_path, byte_position, "int")
 	def flush(self) -> None:
 		if self.dirty:
 			for i in range(len(self.page_paths)):
 				self.file_handler.write_position(self.page_paths[i], self.byte_positions[i], self._value)
 		self.flushed = True
+		print(f"FLUSHED {self._value} in {self.page_paths}")
 	def value(self, increment: int=0) -> int:
 		if self.flushed:
 			raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
@@ -83,6 +85,7 @@ class PsuedoBuffIntValue:
 	def __del__(self) -> None: # ensure that the value was flushed, if it was dirty
 		if not self.flushed and self.dirty:
 			# print(self.page_path, self._value, self.byte_position)
+			print(f"ERROR IN  {self._value} in {self.page_paths}")
 			raise(Exception("unflushed int buffer value"))
 		# self.flush()
 
@@ -437,6 +440,7 @@ class FileHandler:
 		return FullFilePageReadResult(filtered_metadata, filtered_data, page_type)
 
 
+	"""
 	def insert_tail_record(self, metadata: WriteSpecifiedMetadata, *columns:int | None) -> int:
 		total_cols = self.table.total_columns
 
@@ -453,18 +457,19 @@ class FileHandler:
 			physical_page = self.page_to_commit[i]	
 			if physical_page is not None:
 				physical_page.insert(cols[i])
-			self.offset.value(config.BYTES_PER_INT)
-		if self.offset.value() == config.PHYSICAL_PAGE_SIZE:
+			self.tail_offset.value(config.BYTES_PER_INT)
+		if self.tail_offset.value() == config.PHYSICAL_PAGE_SIZE:
 			self.write_new_page(self.page_to_commit, "tail")
 		pg_dir_entry: 'PageDirectoryEntry'
-		pg_dir_entry = PageDirectoryEntry(TailPageID(self.next_base_page_id.value()), MetadataPageID(self.next_metadata_page_id.value()), self.offset.value(), "tail")
+		pg_dir_entry = PageDirectoryEntry(TailPageID(self.next_base_page_id.value()), TailMetadataPageID(self.next_tail_metadata_page_id.value()), self.offset.value(), "tail")
 		self.table.page_directory_buff.value_assign(rid, pg_dir_entry)
 
 		return rid
+	"""
 
 
 
-	def insert_base_record(self, path_type: Literal["base", "tail"], metadata: WriteSpecifiedMetadata, *columns: int | None) -> int: # returns RID of inserted record
+	def insert_base_record(self, metadata: WriteSpecifiedMetadata, *columns: int | None) -> int: # returns RID of inserted record
 		null_bitmask = 0
 		total_cols = self.table.total_columns
 		if metadata.indirection_column == None: # set 1 for null indirection column
@@ -550,11 +555,15 @@ class FileHandler:
 		self.next_base_page_id.flush()
 		self.next_tail_page_id.flush()
 		self.next_base_metadata_page_id.flush()
+		self.next_tail_metadata_page_id.flush()
 		self.next_base_rid.flush()
 		self.next_tail_rid.flush()
 		self.base_offset.flush()
 		self.tail_offset.flush()
 
+	def __del__(self) -> None:
+		# self.flush()
+		print(f"DELETING FILE HANDLER PATH {self.table_path}")
 
 
 
@@ -591,6 +600,9 @@ class Table:
 		# create a B-tree index object for the key index (hard-coded for M1)
 		self.index.create_index(self.key_index)
 
+	def __del__(self) -> None:
+		# self.file_handler.flush()
+		print(f"deleting TABLE {self.name}")
 
 
 
@@ -925,15 +937,17 @@ class Bufferpool:
 			self[idx].pin_count += change
 
 	
+	"""
 	def insert_tail_record(self, table: Table, metadata: WriteSpecifiedMetadata, *columns: int | None) -> int: # Returns the RID of the inserted record
 		return table.file_handler.insert_tail_record(metadata, *columns)
+	"""
 
 
 	def insert_base_record(self, table: Table, record_type: Literal["base", "tail"], metadata: WriteSpecifiedMetadata, *columns: int) -> int: # returns RID of inserted record
 		# table_list = list(filter(lambda table: table.name == table_name, self.tables))
 		# assert len(table_list) == 1
 		# table = table_list[0]
-		return table.file_handler.insert_base_record(record_type, metadata, *columns)
+		return table.file_handler.insert_base_record(metadata, *columns)
 
 	# returns whether the requested portion of record is in the bufferpool, 
 	# and the bufferpool indices of any column of the record found (regardless of whether it was)
@@ -1044,10 +1058,10 @@ class Bufferpool:
 		rid_column_marked=False
 		for entry in self.entries:
 			if entry is not None and entry.physical_page_id == page_id and entry.physical_page_index == config.NULL_COLUMN:
-				entry.physical_page.data[offset:offset+8] = int.to_bytes(bitmask)
+				entry.physical_page.data[offset:offset+8] = int.to_bytes(bitmask, config.BYTES_PER_INT, "big")
 				null_column_marked=True
 			if entry is not None and entry.physical_page_id == page_id and entry.physical_page_index == config.RID_COLUMN:
-				entry.physical_page.data[offset:offset+8] = int.to_bytes(0)
+				entry.physical_page.data[offset:offset+8] = int.to_bytes(0, config.BYTES_PER_INT, "big")
 				rid_column_marked=True
 		return rid_column_marked & null_column_marked
 				
@@ -1062,7 +1076,7 @@ class Bufferpool:
 		if record_column_entry is None: 
 			return False
 
-		record_column_entry.physical_page.data[offset: offset+8] = int.to_bytes(new_value)
+		record_column_entry.physical_page.data[offset: offset+8] = int.to_bytes(new_value, config.BYTES_PER_INT,"big")
 
 		return True
 
