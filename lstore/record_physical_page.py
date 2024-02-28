@@ -21,10 +21,10 @@ class Record:
          #return col_list[key]
 
 
-class BaseRecord(Record):
-    def __init__(self, metadata: WriteSpecifiedMetadata, key: int, *columns: int | None):
-        super().__init__(metadata, "base", *columns)
-        self.key = key
+# class BaseRecord(Record):
+#     def __init__(self, metadata: WriteSpecifiedMetadata, key: int, *columns: int | None):
+#         super().__init__(metadata,*columns)
+#         self.key = key
     # def __str__(self) -> str:
     #     # NOTE: the self.columns is just the physical values in the columns. 
     #     # if the physical value is 0, the actual value could be 0 or None depending on the corresponding NULL_COLUMN value

@@ -909,16 +909,28 @@ class Bufferpool:
 		null_column_marked=False
 		rid_column_marked=False
 		for entry in self.entries:
-			if  entry != None and  entry.physical_page_id == page_id and entry.physical_page_index == config.NULL_COLUMN:
-				entry.physical_page.data[offset:offset+8] = bitmask
+			if entry is not None and entry.physical_page_id == page_id and entry.physical_page_index == config.NULL_COLUMN:
+				entry.physical_page.data[offset:offset+8] = int.to_bytes(bitmask)
 				null_column_marked=True
-			if entry != None and entry.physical_page_id=page_id and entry.physical_page_index=config.RID_COLUMN:
-				entry.physical_page.data[offset:offset+8]=0b0 
+			if entry is not None and entry.physical_page_id == page_id and entry.physical_page_index == config.RID_COLUMN:
+				entry.physical_page.data[offset:offset+8] = int.to_bytes(0)
 				rid_column_marked=True
 		return rid_column_marked & null_column_marked
 				
-				
+	
+	def update_nth_record(self, page_id : PageID, offset: int, col_idx: int, new_value: int) -> bool:
+		record_column_entry = None
 
+		for entry in self.entries:
+			if entry is not None and entry.physical_page_id == page_id and entry.physical_page_index == col_idx:
+				record_column_entry = entry
+		
+		if record_column_entry is None: 
+			return False
+
+		record_column_entry.physical_page.data[offset: offset+8] = int.to_bytes(new_value)
+
+		return True
 
 
 	def get_updated_col(self, table: Table, record: Record, col_idx: DataIndex) -> int | None:
