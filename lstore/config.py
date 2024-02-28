@@ -35,21 +35,22 @@ class config:
 		# 	idx = config.TAIL_PAGE_FILE_SCHEMA.index(field)
 		# 	return config.BYTES_PER_INT * idx
 		class base_tail:
-			METADATA_PTR = 0
-			OFFSET = 8 
-			TPS = 16
-			DATA = 24
+			METADATA_PTR = 0*8
+			OFFSET = 1*8
+			TPS = 2*8
+			DATA = 3*8
 		class metadata:
-			OFFSET = 0
-			DATA = 8
+			OFFSET = 0*8
+			DATA = 1*8
 		class catalog:
-			NUMBER_COLUMNS = 0
-			KEY_INDEX = 8
-			LAST_BASE_PAGE_ID = 16
-			LAST_TAIL_PAGE_ID = 24
-			LAST_METADATA_PAGE_ID = 32
-			LAST_BASE_RID = 40
-			LAST_TAIL_ID = 48
+			NUMBER_COLUMNS = 0*8
+			KEY_INDEX = 1*8
+			LAST_BASE_PAGE_ID = 2*8
+			LAST_TAIL_PAGE_ID = 3*8
+			LAST_BASE_METADATA_PAGE_ID = 4*8
+			LAST_TAIL_METADATA_PAGE_ID = 5*8
+			LAST_BASE_RID = 6*8
+			LAST_TAIL_ID = 7*8
 
 	BYTES_PER_INT = 8	
 

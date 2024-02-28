@@ -6,15 +6,18 @@ from types import FunctionType
 import typing
 import glob
 import os
+
+from lstore import file_handler
 from lstore.index import Index
-from lstore.page_directory_entry import BasePageID, BaseRID, MetadataPageID, PageDirectoryEntry, PageID, TailPageID, TailRID
+from lstore.page_directory_entry import BaseMetadataPageID, BasePageID, BaseRID, MetadataPageID, PageDirectoryEntry, PageID, TailMetadataPageID, TailPageID, TailRID
 from lstore.ColumnIndex import DataIndex, RawIndex
 # from lstore.base_tail_page import BasePage
 from lstore.config import FullMetadata, WriteSpecifiedMetadata, config
 from lstore.helper import helper
 from lstore.record_physical_page import PhysicalPage, Record
-from typing import Any, List, Literal, Tuple, Type, TypeAlias, TypeVar, Generic, Annotated, cast
+from typing import Any, List, Literal, Tuple, Type, TypeAlias, TypeGuard, TypeVar, Generic, Annotated, cast
 
+TPageType = Literal["base", "tail", "base_metadata", "tail_metadata"]
 class BufferpoolIndex(int):
 	pass
 class BufferpoolSearchResult:
@@ -47,24 +50,22 @@ class BufferpoolEntry:
 		self.dirty_bit = dirty_bit
 		self.physical_page_id = physical_page_id
 		self.physical_page_index = physical_page_index
-		if page_type == "base" or page_type == "tail" or page_type == "metadata" or page_type is None:
-			self.page_type = page_type
-		else:
-			raise(Exception("invalid page_type value passed to BufferpoolEntry"))
 		self.table = table
 
 class PsuedoBuffIntValue:
 	def __init__(self, file_handler: FileHandler, page_sub_path: PageID | Literal["catalog"], byte_position: int) -> None:
 		self.page_sub_path = page_sub_path
-		self.page_path = file_handler.page_path(page_sub_path)
+		self.page_paths = [file_handler.page_path(page_sub_path)]
 		self.file_handler = file_handler
-		self.byte_position = byte_position
+		self.byte_positions = [byte_position]
 		self._value = file_handler.read_int_value(page_sub_path, byte_position)
 		self.flushed = False
 		self.dirty = False
 		# self._value = file_handler.read_value(page_sub_path, byte_position, "int")
 	def flush(self) -> None:
-		self.file_handler.write_position(self.page_path, self.byte_position, self._value)
+		if self.dirty:
+			for i in range(len(self.page_paths)):
+				self.file_handler.write_position(self.page_paths[i], self.byte_positions[i], self._value)
 		self.flushed = True
 	def value(self, increment: int=0) -> int:
 		if self.flushed:
@@ -73,20 +74,90 @@ class PsuedoBuffIntValue:
 			self._value += increment 
 			self.dirty = True
 		return self._value
-	def __del__(self) -> None: # flush when this value is deleted
+
+	# will flush the value to memory to THIS location also. 
+	def add_flush_location(self, page_sub_path: PageID | Literal["catalog"], byte_position: int) -> None:
+		self.page_paths.append(self.file_handler.page_path(page_sub_path))
+		self.byte_positions.append(byte_position)
+
+	def __del__(self) -> None: # ensure that the value was flushed, if it was dirty
 		if not self.flushed and self.dirty:
-			print(self.page_path, self._value, self.byte_position)
-			raise(Exception("unflushed buffer value!"))
+			# print(self.page_path, self._value, self.byte_position)
+			raise(Exception("unflushed int buffer value"))
 		# self.flush()
 
-
-R = TypeVar('R', bound=int)
-class PseudoBuffIntTypeValue(PsuedoBuffIntValue, Generic[R]):
-	def __init__(self, file_handler: 'FileHandler', page_sub_path: PageID | Literal["catalog"], byte_position: int) -> None:
+class PBBasePageID(PsuedoBuffIntValue):
+	def __init__(self, file_handler: FileHandler, page_sub_path: PageID | Literal["catalog"], byte_position: int) -> None:
 		super().__init__(file_handler, page_sub_path, byte_position)
-	def value(self, increment: int = 0) -> R:
-		super().value()
-		return cast(R, self._value)
+	def value(self, increment: int = 0) -> BasePageID:
+		# super().value()
+		if self.flushed:
+			raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
+		if increment != 0:
+			self._value += increment 
+			self.dirty = True
+		return BasePageID(self._value)
+	# will flush the value to memory to THIS location also. 
+
+class PBTailPageID(PsuedoBuffIntValue):
+	def __init__(self, file_handler: FileHandler, page_sub_path: PageID | Literal["catalog"], byte_position: int) -> None:
+		super().__init__(file_handler, page_sub_path, byte_position)
+	def value(self, increment: int = 0) -> TailPageID:
+		# super().value()
+		if self.flushed:
+			raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
+		if increment != 0:
+			self._value += increment 
+			self.dirty = True
+		return TailPageID(self._value)
+
+class PBBaseMetadataPageID(PsuedoBuffIntValue):
+	def __init__(self, file_handler: FileHandler, page_sub_path: PageID | Literal["catalog"], byte_position: int) -> None:
+		super().__init__(file_handler, page_sub_path, byte_position)
+	def value(self, increment: int = 0) -> BaseMetadataPageID:
+		# super().value()
+		if self.flushed:
+			raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
+		if increment != 0:
+			self._value += increment 
+			self.dirty = True
+		return BaseMetadataPageID(self._value)
+	
+class PBTailMetadataPageID(PsuedoBuffIntValue):
+	def __init__(self, file_handler: FileHandler, page_sub_path: PageID | Literal["catalog"], byte_position: int) -> None:
+		super().__init__(file_handler, page_sub_path, byte_position)
+	def value(self, increment: int = 0) -> TailMetadataPageID:
+		# super().value()
+		if self.flushed:
+			raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
+		if increment != 0:
+			self._value += increment 
+			self.dirty = True
+		return TailMetadataPageID(self._value)
+
+class PBBaseRID(PsuedoBuffIntValue):
+	def __init__(self, file_handler: FileHandler, page_sub_path: PageID | Literal["catalog"], byte_position: int) -> None:
+		super().__init__(file_handler, page_sub_path, byte_position)
+	def value(self, increment: int = 0) -> BaseRID:
+		# super().value()
+		if self.flushed:
+			raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
+		if increment != 0:
+			self._value += increment 
+			self.dirty = True
+		return BaseRID(self._value)
+
+class PBTailRID(PsuedoBuffIntValue):
+	def __init__(self, file_handler: FileHandler, page_sub_path: PageID | Literal["catalog"], byte_position: int) -> None:
+		super().__init__(file_handler, page_sub_path, byte_position)
+	def value(self, increment: int = 0) -> TailRID:
+		# super().value()
+		if self.flushed:
+			raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
+		if increment != 0:
+			self._value += increment 
+			self.dirty = True
+		return TailRID(self._value)
 
 U = TypeVar('U')
 V = TypeVar('V')
@@ -130,18 +201,23 @@ class FileHandler:
 		self.table = table
 		self.table_path = os.path.join(table.db_path, self.table.name)
 		## FILE INITIALIZATION
-		self.initialize_table_files() # catalog, index, page_directory
-		self.initialize_page(BasePageID(1)) # the first base page has ID 1
-		self.initialize_page(TailPageID(1)) # the first base page has ID 1
-		self.initialize_page(MetadataPageID(1)) # the first base page has ID 1
+		if not os.path.isfile(self.table_file_path("catalog")): # if the catalog file exists, all other files should also exist..
+			self.initialize_table_files() # catalog, index, page_directory
+			self.initialize_base_tail_page(BasePageID(1), BaseMetadataPageID(1)) # first metadata ID is 1
+			self.initialize_base_tail_page(TailPageID(1), TailMetadataPageID(1)) # first metadata ID is 1
+			self.initialize_metadata_file(BaseMetadataPageID(1))
+			self.initialize_metadata_file(TailMetadataPageID(1))
 		## END FILE INIT
-		self.next_base_page_id = PseudoBuffIntTypeValue[BasePageID](self, "catalog", config.byte_position.catalog.LAST_BASE_PAGE_ID)
-		self.next_tail_page_id = PseudoBuffIntTypeValue[TailPageID](self, "catalog", config.byte_position.catalog.LAST_TAIL_PAGE_ID)
-		self.next_metadata_page_id = PseudoBuffIntTypeValue[MetadataPageID](self, "catalog", config.byte_position.catalog.LAST_METADATA_PAGE_ID)
-		self.next_base_rid = PseudoBuffIntTypeValue[BaseRID](self, "catalog", config.byte_position.catalog.LAST_BASE_RID)
-		self.next_tail_rid = PseudoBuffIntTypeValue[TailRID](self, "catalog", config.byte_position.catalog.LAST_TAIL_ID)
+		self.next_base_page_id = PBBasePageID(self, "catalog", config.byte_position.catalog.LAST_BASE_PAGE_ID)
+		self.next_tail_page_id = PBTailPageID(self, "catalog", config.byte_position.catalog.LAST_TAIL_PAGE_ID)
+		self.next_base_metadata_page_id = PBBaseMetadataPageID(self, "catalog", config.byte_position.catalog.LAST_BASE_METADATA_PAGE_ID)
+		self.next_tail_metadata_page_id = PBTailMetadataPageID(self, "catalog", config.byte_position.catalog.LAST_TAIL_METADATA_PAGE_ID)
+		self.next_base_rid = PBBaseRID(self, "catalog", config.byte_position.catalog.LAST_BASE_RID)
+		self.next_tail_rid = PBTailRID(self, "catalog", config.byte_position.catalog.LAST_TAIL_ID)
 		# TODO: populate the offset byte with 0 when creating a new page
-		self.offset = PsuedoBuffIntValue(self, BasePageID(self.next_base_page_id.value() - 1), config.byte_position.base_tail.OFFSET) # the current offset is based on the last written page
+		self.base_offset = PsuedoBuffIntValue(self, BasePageID(self.next_base_page_id.value() - 1), config.byte_position.base_tail.OFFSET) # the current offset is based on the last written page
+		self.base_offset.add_flush_location(BaseMetadataPageID(self.next_base_metadata_page_id.value() - 1), config.byte_position.metadata.OFFSET) # flush the offset in the corresponding metadata file along with the base file
+		self.tail_offset = PsuedoBuffIntValue(self, TailPageID(self.next_tail_page_id.value() - 1), config.byte_position.base_tail.OFFSET) # the current offset is based on the last written page
 		# t_base = self.read_projected_cols_of_page(BasePageID(self.next_base_page_id.value() - 1)) # could be empty PhysicalPages, to start. but the page files should still exist, even when they are empty
 		# if t_base is None:
 		# 	raise(Exception("the base_page_id just before the next_page_id must have a folder."))
@@ -163,8 +239,10 @@ class FileHandler:
 	def tail_path(self, tail_page_id: TailPageID) -> str:
 		return os.path.join(self.table_path, f"tail_{tail_page_id}")
 		# return os.path.join(config.PATH, self.table.name, f"tail_{tail_page_id}")
-	def metadata_path(self, metadata_page_id: MetadataPageID) -> str:
-		return os.path.join(self.table_path, f"metadata_{metadata_page_id}")
+	def metadata_path(self, metadata_page_id: BaseMetadataPageID | TailMetadataPageID) -> str:
+		# assert isinstance(metadata_page_id, BaseMetadataPageID) or isinstance(metadata_page_id, TailMetadataPageID)
+		metadata_page_type = "base" if isinstance(metadata_page_id, BaseMetadataPageID) else "tail"
+		return os.path.join(self.table_path, f"{metadata_page_type}_metadata_{metadata_page_id}")
 
 	# this calculated property gives the path for a "table file". 
 	# Table files are files which apply to the entire table. These files are, as of now, 
@@ -194,7 +272,7 @@ class FileHandler:
 			path = self.base_path(page_id)
 		elif isinstance(page_id, TailPageID):
 			path = self.tail_path(page_id)
-		elif isinstance(page_id, MetadataPageID):
+		elif isinstance(page_id, BaseMetadataPageID) or isinstance(page_id, TailMetadataPageID):
 			path = self.metadata_path(page_id)
 		else:
 			raise(Exception(f"page_id had unexpected type of {type(page_id)}"))
@@ -208,29 +286,62 @@ class FileHandler:
 		return True
 
 	# should only be "base" or "tail" path_type
-	def write_new_page(self, physical_pages: list[PhysicalPage], path_type: str) -> bool: # the page MUST be full in order to write. returns true if success
-		written_id = self.next_base_page_id.value(1)
-		path = self.base_path(written_id) if path_type == "base" else self.tail_path(self.next_tail_page_id.value(1))
+	# 
+	def write_new_base_page(self) -> bool: # the page MUST be full in order to write. returns true if success
 
 		# check that physical page sizes and offsets are the same
 		assert len(
-			set(map(lambda physicalPage: physicalPage.size, physical_pages))) <= 1
+			set(map(lambda physicalPage: physicalPage.size, self.page_to_commit))) <= 1
 		assert len(
-			set(map(lambda physicalPage: physicalPage.offset, physical_pages))) <= 1
+			set(map(lambda physicalPage: physicalPage.offset, self.page_to_commit))) <= 1
+		
+		# STEP 1. get offset for this page. increment offset to the end
+		offset_to_write = self.page_to_commit[0].offset # amount of bytes to write
+		curr_offset = self.base_offset.value()
+		# if we can fit all of the remaining physical page data into this page, then only increment
+		# by that value. otherwise, set the offset value to config.PHYSICAL_PAGE_SIZE
+		self.base_offset.value(offset_to_write if curr_offset + offset_to_write <= config.PHYSICAL_PAGE_SIZE else config.PHYSICAL_PAGE_SIZE - curr_offset)
+		# old_metadata_pointer_buff = PseudoBuffIntTypeValue[MetadataPageID](self, )
+		self.base_offset.flush() # flush the old offset (this is ahead of what we will write, but it's okay)
 
-		metadata_pointer = self.next_metadata_page_id.value(1)
+
+		# STEP 2. write whatever we can into this page, both metadata and base
+		p_metadata_1 = self.metadata_path(BaseMetadataPageID(self.next_base_metadata_page_id.value() - 1))
+		offset_written = config.PHYSICAL_PAGE_SIZE - curr_offset
+		with open(p_metadata_1, "wb") as old_metadata_file:
+			for i in range(0, config.NUM_METADATA_COL):
+				old_metadata_file.seek(curr_offset, 1) # skip over already written stuff
+				old_metadata_file.write(self.page_to_commit[i][0:offset_written]) 
+
+		p_base_1 = self.base_path(BasePageID(self.next_base_page_id.value() - 1))
+		with open(p_base_1, "wb") as old_base_file:
+			for i in range(config.NUM_METADATA_COL, self.table.total_columns):
+				old_base_file.seek(curr_offset, 1) # skip over already written stuff
+				old_base_file.write(self.page_to_commit[i][0:offset_written])
+
+
+		# STEP 3. take the remaining and write it into the next page
+		written_id = self.next_base_page_id.value(1)
+		written_base_page_path = self.base_path(written_id) 
+
+		metadata_pointer = self.next_base_metadata_page_id.value(1)
 		self.initialize_metadata_file(metadata_pointer)
+		self.initialize_base_tail_page(written_id, metadata_pointer)
+		self.base_offset = PsuedoBuffIntValue(self, written_id, config.byte_position.base_tail.OFFSET)
+		self.base_offset.add_flush_location(metadata_pointer, config.byte_position.metadata.OFFSET)
 
 
-		open(path, "x")
-		with open(path, "wb") as file: # open page file
-			file.write(metadata_pointer.to_bytes(config.BYTES_PER_INT, byteorder="big"))
-			file.write((16).to_bytes(8, byteorder="big")) # offset 16 is the first byte offset where data can go
-			for i in range(config.NUM_METADATA_COL, len(physical_pages)): # write the data columns
-				file.write(physical_pages[i].data)
+		with open(self.metadata_path(metadata_pointer), "wb") as new_metadata_file: # open new metadata file
+			for i in range(0, config.NUM_METADATA_COL):
+				# the order is swapped because we are adding a new page rather than adding to a page
+				new_metadata_file.write(self.page_to_commit[i][offset_written:]) # config.PHYSICAL_PAGE_SIZE - offset_written
+				new_metadata_file.seek(offset_written, 1) 
 
-		# t = self.read_page(BasePageID(self.next_base_page_id.value()))
-		# assert t
+		with open(written_base_page_path, "wb") as file: # open new page file
+			for i in range(config.NUM_METADATA_COL, len(self.page_to_commit)): # write the data columns
+				file.write(self.page_to_commit[i][offset_written:])
+				file.seek(offset_written, 1)
+
 		self.page_to_commit = [PhysicalPage()] * self.table.total_columns
 		return True
 
@@ -252,12 +363,16 @@ class FileHandler:
 			return pickle.load(handle)
 
 
+	@staticmethod
+	def is_valid_table_file_name(name: Any) -> TypeGuard[Literal["catalog", "page_directory", "indices"]]:
+		return name == "catalog" or name == "page_directory" or name == "indices"
+
 	# returns the full page path, given a particular pageID OR 
 	# the special catalog/page_directory files
 	def page_path(self, page_sub_path: PageID | Literal["catalog", "page_directory", "indices"]) -> str:
-		if isinstance(page_sub_path, PageID):
+		if isinstance(page_sub_path, BasePageID) or isinstance(page_sub_path, TailPageID) or isinstance(page_sub_path, BaseMetadataPageID) or isinstance(page_sub_path, TailMetadataPageID):
 			return self.page_id_to_path(page_sub_path)
-		elif page_sub_path == "catalog" or page_sub_path == "page_directory":
+		elif FileHandler.is_valid_table_file_name(page_sub_path):
 			return self.table_file_path(page_sub_path)
 		else:
 			raise(Exception(f"unexpected page_sub_path {page_sub_path}"))
@@ -275,7 +390,7 @@ class FileHandler:
 		physical_pages: list[PhysicalPage | None] = [None] * self.table.num_columns
 		metadata_pages: list[PhysicalPage | None] = [None] * config.NUM_METADATA_COL
 
-		metadata_buff = PseudoBuffIntTypeValue[MetadataPageID](self, page_id, config.byte_position.base_tail.METADATA_PTR)
+		metadata_buff = PBBaseMetadataPageID(self, page_id, config.byte_position.base_tail.METADATA_PTR)
 		metadata_path = self.metadata_path(metadata_buff.value())
 		path = self.page_id_to_path(page_id)
 		if not os.path.isfile(metadata_path) or not os.path.isfile(path):
@@ -323,7 +438,7 @@ class FileHandler:
 
 
 
-	def insert_record(self, path_type: Literal["base", "tail"], metadata: WriteSpecifiedMetadata, *columns: int | None) -> int: # returns RID of inserted record
+	def insert_base_record(self, metadata: WriteSpecifiedMetadata, *columns: int | None) -> int: # returns RID of inserted record
 		null_bitmask = 0
 		total_cols = self.table.total_columns
 		if metadata.indirection_column == None: # set 1 for null indirection column
@@ -348,19 +463,16 @@ class FileHandler:
 		list_columns.insert(config.TIMESTAMP_COLUMN, int(time.time()))
 		list_columns.insert(config.SCHEMA_ENCODING_COLUMN, metadata.schema_encoding)
 		list_columns.insert(config.NULL_COLUMN, null_bitmask)
+		list_columns.insert(config.BASE_RID, rid)
 		cols = tuple(list_columns)
 		for i in range(len(self.page_to_commit)):
 			physical_page = self.page_to_commit[i]	
 			if physical_page is not None:
 				physical_page.insert(cols[i])
-			self.offset.value(config.BYTES_PER_INT)
-		if self.offset.value() == config.PHYSICAL_PAGE_SIZE:
-			self.write_new_page(self.page_to_commit, path_type)	
-		pg_dir_entry: 'PageDirectoryEntry'
-		if path_type == "base":
-			pg_dir_entry = PageDirectoryEntry(BasePageID(self.next_base_page_id.value()), MetadataPageID(self.next_metadata_page_id.value()), self.offset.value(), "base")
-		elif path_type == "tail":
-			pg_dir_entry = PageDirectoryEntry(TailPageID(self.next_base_page_id.value()), MetadataPageID(self.next_metadata_page_id.value()), self.offset.value(), "tail")
+			self.base_offset.value(config.BYTES_PER_INT)
+		if self.base_offset.value() == config.PHYSICAL_PAGE_SIZE:
+			self.write_new_base_page()	
+		pg_dir_entry = PageDirectoryEntry(BasePageID(self.next_base_page_id.value()), BaseMetadataPageID(self.next_base_metadata_page_id.value()), self.base_offset.value(), "base")
 		self.table.page_directory_buff.value_assign(rid, pg_dir_entry)
 		return rid
 
@@ -389,17 +501,17 @@ class FileHandler:
 		with open(index_path, "wb") as index_file:
 			pickle.dump(Index(self.table.num_columns), index_file)
 
-	def initialize_page(self, page_id: PageID) -> None:
+	def initialize_base_tail_page(self, page_id: BasePageID | TailPageID, metadata_id: BaseMetadataPageID | TailMetadataPageID) -> None:
 		page_path = self.page_id_to_path(page_id)
 		open(page_path, "x") # create the file
 		with open(page_path, "wb") as base_file:
-			helper.write_int(base_file, 1) # the first base page points to metadata page 1
-			helper.write_int(base_file, 0)
+			helper.write_int(base_file, metadata_id) # the first base page points to metadata page 1
+			helper.write_int(base_file, 0) # offset starts at 0
 			helper.write_int(base_file, config.INITIAL_TPS) # TPS starts at 2^64
-			for _ in range(self.table.num_columns): # write empty physical page for first physical page
+			for _ in range(self.table.num_columns): # write empty physical page for first physical pages
 				base_file.write(bytearray(config.PHYSICAL_PAGE_SIZE))
 
-	def initialize_metadata_file(self, page_id: MetadataPageID) -> None:
+	def initialize_metadata_file(self, page_id: BaseMetadataPageID | TailMetadataPageID) -> None:
 		page_path = self.page_id_to_path(page_id)
 		open(page_path, "x") 
 		with open(page_path, "wb") as file: # open metadata file
@@ -408,12 +520,14 @@ class FileHandler:
 				file.write(bytearray(config.PHYSICAL_PAGE_SIZE)) # write the metadata columns
 	
 	def flush(self) -> None:
+		self.write_new_base_page()
 		self.next_base_page_id.flush()
 		self.next_tail_page_id.flush()
-		self.next_metadata_page_id.flush()
+		self.next_base_metadata_page_id.flush()
 		self.next_base_rid.flush()
 		self.next_tail_rid.flush()
-		self.offset.flush()
+		self.base_offset.flush()
+		self.tail_offset.flush()
 
 
 
@@ -688,7 +802,8 @@ class BufferedRecord:
 			get_no_none_check(config.BASE_RID, self.record_offset), \
 
 		# this is just outside the metadata column range. thus it should reveal the actual page type of base or tail (both base and tail pages will have "metadata" type pages in the bufferpool)
-		page_type = self.bufferpool[self.buff_indices[config.NUM_METADATA_COL]].page_type
+		# page_type = self.bufferpool[self.buff_indices[config.NUM_METADATA_COL]].page_type
+		page_type = self.bufferpool.get_page_type(self.buff_indices[config.NUM_METADATA_COL])
 		is_base_page = False
 		if page_type == "base":
 			is_base_page = True
@@ -749,13 +864,33 @@ class Bufferpool:
 
 	def change_bufferpool_entry(self, entry: BufferpoolEntry | None, buff_idx: BufferpoolIndex) -> None:
 		self[buff_idx] = entry
-		# self.pin_counts[buff_idx] = entry.pin_count
-		# self.buffered_physical_pages[buff_idx] = entry.physical_page
-		# self.dirty_bits[buff_idx] = entry.dirty_bit
-		# self.ids_of_physical_pages[buff_idx] = entry.physical_page_id
-		# self.index_of_physical_page_in_the_page[buff_idx] = entry.physical_page_index
-		# self.page_types[buff_idx] = entry.page_type
-		# self.tables[buff_idx] = entry.table
+
+
+	def get_page_type(self, buff_idx: BufferpoolIndex) -> TPageType:
+		page_id = self[buff_idx].physical_page_id
+		if isinstance(page_id, BasePageID):
+			return "base"
+		elif isinstance(page_id, TailPageID):
+			return "tail"
+		elif isinstance(page_id, BaseMetadataPageID):
+			return "base_metadata"
+		elif isinstance(page_id, TailMetadataPageID):
+			return "tail_metadata"
+		else:
+			raise(Exception("couldn't get page type for a page in the bufferpool because the ID type didn't match any expected type"))
+
+	@staticmethod
+	def make_page_id(page_id: int, page_type: TPageType) -> PageID:
+		match page_type:
+			case "base":
+				return BasePageID(page_id)
+			case "tail":
+				return TailPageID(page_id)
+			case "base_metadata":
+				return BaseMetadataPageID(page_id)
+			case "tail_metadata":
+				return TailMetadataPageID(page_id)
+
 
 
 	def change_pin_count(self, buff_indices: list[BufferpoolIndex], change: int) -> None:
@@ -767,7 +902,7 @@ class Bufferpool:
 		# table_list = list(filter(lambda table: table.name == table_name, self.tables))
 		# assert len(table_list) == 1
 		# table = table_list[0]
-		return table.file_handler.insert_record(record_type, metadata, *columns)
+		return table.file_handler.insert_base_record(metadata, *columns)
 
 	# returns whether the requested portion of record is in the bufferpool, 
 	# and the bufferpool indices of any column of the record found (regardless of whether it was)
@@ -862,12 +997,12 @@ class Bufferpool:
 			physical_page = all_physical_pages[i]
 			if physical_page is not None:
 				new_buff_idx = buff_indices[i]
-				page_type = page_directory_entry.page_type if i >= config.NUM_METADATA_COL else "metadata" # metadata columns are at the beginning
-				page_id = BasePageID(record_page_id) if page_type == "base" else TailPageID(record_page_id) if page_type == "tail" else MetadataPageID(record_page_id)
-				# okay technically speaking,
-				# this typing is now redundant since page_type exists...
-				# keeping it here bc too lazy to refactor
-				self.change_bufferpool_entry(BufferpoolEntry(0, physical_page, False, page_id, i, page_type, table), new_buff_idx)
+				page_type = page_directory_entry.page_type
+				page_id = page_directory_entry.page_id
+				bufferpool_page_type = self.get_page_type(new_buff_idx)
+
+					
+				self.change_bufferpool_entry(BufferpoolEntry(0, physical_page, False, Bufferpool.make_page_id(page_id, bufferpool_page_type), i, page_type, table), new_buff_idx)
 		return True
 			# self.pin_counts[new_buff_idx] = 0 # initialize to
 

@@ -144,7 +144,7 @@ class Query:
         # the null column in this Metadata object won't be used by the page insert.
         # print(f"trying to insert")
         # print(f"trying to insert {columns}")
-        rid = self.table.file_handler.insert_record("base", WriteSpecifiedMetadata(None, 0b0, None),
+        rid = self.table.file_handler.insert_base_record(WriteSpecifiedMetadata(None, 0b0, None),
                                                                      *columns)
         # print(f"rid: {rid}")
 

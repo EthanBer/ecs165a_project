@@ -21,10 +21,10 @@ class Record:
          #return col_list[key]
 
 
-class BaseRecord(Record):
-    def __init__(self, metadata: WriteSpecifiedMetadata, key: int, *columns: int | None):
-        super().__init__(metadata, "base", *columns)
-        self.key = key
+# class BaseRecord(Record):
+#     def __init__(self, metadata: WriteSpecifiedMetadata, key: int, *columns: int | None):
+#         super().__init__(metadata, "base", *columns)
+#         self.key = key
     # def __str__(self) -> str:
     #     # NOTE: the self.columns is just the physical values in the columns. 
     #     # if the physical value is 0, the actual value could be 0 or None depending on the corresponding NULL_COLUMN value
@@ -58,6 +58,8 @@ class PhysicalPage:
         self.data[self.offset : self.offset+8] = packed_data
         self.offset += 8  
 
+    def __getitem__(self, val: slice) -> bytearray:
+        return self.data[val.start:val.stop]
     
     # TODO: move get_check_for_none into this function?
     # def __get_nth_record__(self, record_idx: int) -> int | None:
