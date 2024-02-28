@@ -1,14 +1,9 @@
 """
 A  -Trees, but other data structures can be used as well.
 """
-from BTrees.OOBTree import OOBTree # type: ignore
+from BTrees.OOBTree import OOBTree  # type: ignore
 
 
-# Tree
-# B-Tree documentation:
-# https://btrees.readthedocs.io/en/latest/overview.html#related-data-structures
-class BTree(OOBTree):
-    pass
 class Index:
 
     def __init__(self, num_columns: int):
@@ -17,14 +12,19 @@ class Index:
 
         pass
 
+    # Tree
+    # B-Tree documentation:
+    # https://btrees.readthedocs.io/en/latest/overview.html#related-data-structures
+    class BTree(OOBTree):
+        pass
 
-    def locate(self, column: int, value: int) -> int | None:
+    def locate(self, column: int, value: int) -> int | list | None:
         try:
-            index = self.indices[column] 
-            if index is None:
-                return None
-            search_result = index[value]
-            return search_result
+            search_result = self.indices[column][value]
+            if len(search_result) == 1:
+                return search_result[0]
+            else:
+                return search_result
 
         except:
             return None
@@ -39,19 +39,25 @@ class Index:
 
     def create_index(self, column_number: int) -> None:
         if self.indices[column_number] is None:
-            self.indices[column_number] = BTree(t=3)
+            self.indices[column_number] = self.BTree(t=3)
 
-    def update_index(self, column_number: int, key: int | None, value: int) -> None:
-        index = self.indices[column_number]  
-        if index is not None:
-            index.update({key: value})
+    def update_index(self, column_number: int, key: int, value: int) -> None:
+
+        index_object = self.indices[column_number]
+        existing_vals = self.locate(column_number, key)
+
+        if existing_vals is not None:
+            existing_vals = index_object[key]
+            existing_vals.append(value)
+            index_object.update({key: existing_vals})
+        else:
+            index_object.update({key: [value]})
 
     """
     # optional: Drop index of specific column
     """
 
-    """
-    
     def drop_index(self, column_number):
         pass
-    """
+
+
