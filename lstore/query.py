@@ -1,7 +1,7 @@
 from typing import Literal
 from lstore.bufferpool import PsuedoBuffIntValue, Table
 from lstore.ColumnIndex import DataIndex, RawIndex
-from lstore.page_directory_entry import PageDirectoryEntry, PageID
+from lstore.page_directory_entry import PageDirectoryEntry, BasePageID
 #from lstore.pseudo_buff_dict_value import Record
 from lstore.record_physical_page import Record
 from lstore.index import Index
@@ -545,7 +545,7 @@ class Query:
             else: #deleting base record
                 assert base_record.metadata.rid is not None
                 base_dir_entry = self.table.page_directory_buff[base_record.metadata.rid]
-                self.db_bpool.delete_nth_record(self.table, PageID(base_record.metadata.base_rid), base_dir_entry.offset)# the other bits in the null column no longer matter because they are deleted
+                self.db_bpool.delete_nth_record(self.table, BasePageID(base_record.metadata.base_rid), base_dir_entry.offset)# the other bits in the null column no longer matter because they are deleted
                 #base_dir_entry.page_id.update_nth_record(base_dir_entry.offset, config.NULL_COLUMN, bitmask)
             
         #base_indirection = self.insert_tail(page_range, tail_indirection, tail_schema_encoding, *updated_columns)

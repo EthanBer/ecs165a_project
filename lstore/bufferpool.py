@@ -539,7 +539,7 @@ class FileHandler:
 		return FullFilePageReadResult(filtered_metadata, filtered_data, page_type)
 
 
-	"""
+	
 	def insert_tail_record(self, metadata: WriteSpecifiedMetadata, *columns:int | None) -> int:
 		total_cols = self.table.total_columns
 
@@ -555,16 +555,17 @@ class FileHandler:
 		for i in range(len(self.page_to_commit)):
 			physical_page = self.page_to_commit[i]	
 			if physical_page is not None:
-				physical_page.insert(cols[i])
+				if not physical_page.has_capacity():
+					self.write_new_tail_page()
+				else:
+					physical_page.insert(cols[i])
 			self.tail_offset.value(config.BYTES_PER_INT)
-		if self.tail_offset.value() == config.PHYSICAL_PAGE_SIZE:
-			self.write_new_page(self.page_to_commit, "tail")
 		pg_dir_entry: 'PageDirectoryEntry'
-		pg_dir_entry = PageDirectoryEntry(TailPageID(self.next_base_page_id.value()), TailMetadataPageID(self.next_tail_metadata_page_id.value()), self.offset.value(), "tail")
+		pg_dir_entry = PageDirectoryEntry(TailPageID(self.next_base_page_id.value()), TailMetadataPageID(self.next_tail_metadata_page_id.value()), self.tail_offset.value(), "tail")
 		self.table.page_directory_buff.value_assign(rid, pg_dir_entry)
-
+		
 		return rid
-	"""
+	
 
 
 
@@ -601,9 +602,7 @@ class FileHandler:
 				if physical_page.has_capacity():
 					physical_page.insert(cols[i])
 				else:
-					
 					self.write_new_base_page()
-					
 		self.base_offset.value(config.BYTES_PER_INT)
 		if self.base_offset.value() == config.PHYSICAL_PAGE_SIZE:
 			self.write_new_base_page()	
@@ -1048,10 +1047,10 @@ class Bufferpool:
 			self[idx].pin_count += change
 
 	
-	"""
+	
 	def insert_tail_record(self, table: Table, metadata: WriteSpecifiedMetadata, *columns: int | None) -> int: # Returns the RID of the inserted record
 		return table.file_handler.insert_tail_record(metadata, *columns)
-	"""
+	
 
 
 	def insert_base_record(self, table: Table, record_type: Literal["base", "tail"], metadata: WriteSpecifiedMetadata, *columns: int) -> int: # returns RID of inserted record
