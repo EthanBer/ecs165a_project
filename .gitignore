@@ -1,2 +1,3 @@
 lstore/__pycache__/
 .vscode/
+TEST_DB_PATH/

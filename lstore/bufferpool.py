@@ -1,6 +1,7 @@
 from __future__ import annotations
 from collections import namedtuple
 import pickle
+import struct
 import time
 from types import FunctionType
 import typing
@@ -54,13 +55,13 @@ class BufferpoolEntry:
 
 class PsuedoBuffIntValue:
 	def __init__(self, file_handler: FileHandler, page_sub_path: PageID | Literal["catalog"], byte_position: int) -> None:
+		self.flushed = False
+		self.dirty = False
 		self.page_sub_path = page_sub_path
 		self.page_paths = [file_handler.page_path(page_sub_path)]
 		self.file_handler = file_handler
 		self.byte_positions = [byte_position]
 		self._value = file_handler.read_int_value(page_sub_path, byte_position)
-		self.flushed = False
-		self.dirty = False
 		print(f"INITIING TO {self._value} and {self.page_paths}")
 		# self._value = file_handler.read_value(page_sub_path, byte_position, "int")
 	def flush(self) -> None:
@@ -70,12 +71,14 @@ class PsuedoBuffIntValue:
 		self.flushed = True
 		print(f"FLUSHED {self._value} in {self.page_paths}")
 	def value(self, increment: int=0) -> int:
+		val = self._value
 		if self.flushed:
 			raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
 		if increment != 0:
 			self._value += increment 
 			self.dirty = True
-		return self._value
+		print(f"value {val} accessed with increment {increment}, with page_paths = {self.page_paths}")
+		return val
 
 	# will flush the value to memory to THIS location also. 
 	def add_flush_location(self, page_sub_path: PageID | Literal["catalog"], byte_position: int) -> None:
@@ -93,74 +96,79 @@ class PBBasePageID(PsuedoBuffIntValue):
 	def __init__(self, file_handler: FileHandler, page_sub_path: PageID | Literal["catalog"], byte_position: int) -> None:
 		super().__init__(file_handler, page_sub_path, byte_position)
 	def value(self, increment: int = 0) -> BasePageID:
-		# super().value()
+		val = self._value
 		if self.flushed:
 			raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
 		if increment != 0:
 			self._value += increment 
 			self.dirty = True
-		return BasePageID(self._value)
+		return BasePageID(val)
 	# will flush the value to memory to THIS location also. 
 
 class PBTailPageID(PsuedoBuffIntValue):
 	def __init__(self, file_handler: FileHandler, page_sub_path: PageID | Literal["catalog"], byte_position: int) -> None:
 		super().__init__(file_handler, page_sub_path, byte_position)
 	def value(self, increment: int = 0) -> TailPageID:
-		# super().value()
+		# super().value()e
+		val = self._value
 		if self.flushed:
 			raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
 		if increment != 0:
 			self._value += increment 
 			self.dirty = True
-		return TailPageID(self._value)
+		return TailPageID(val)
 
 class PBBaseMetadataPageID(PsuedoBuffIntValue):
 	def __init__(self, file_handler: FileHandler, page_sub_path: PageID | Literal["catalog"], byte_position: int) -> None:
 		super().__init__(file_handler, page_sub_path, byte_position)
 	def value(self, increment: int = 0) -> BaseMetadataPageID:
 		# super().value()
+		val = self._value
 		if self.flushed:
 			raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
 		if increment != 0:
 			self._value += increment 
 			self.dirty = True
-		return BaseMetadataPageID(self._value)
+		return BaseMetadataPageID(val)
 	
 class PBTailMetadataPageID(PsuedoBuffIntValue):
 	def __init__(self, file_handler: FileHandler, page_sub_path: PageID | Literal["catalog"], byte_position: int) -> None:
 		super().__init__(file_handler, page_sub_path, byte_position)
 	def value(self, increment: int = 0) -> TailMetadataPageID:
 		# super().value()
+		val = self._value
 		if self.flushed:
 			raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
 		if increment != 0:
 			self._value += increment 
 			self.dirty = True
-		return TailMetadataPageID(self._value)
+		return TailMetadataPageID(val)
 
 class PBBaseRID(PsuedoBuffIntValue):
 	def __init__(self, file_handler: FileHandler, page_sub_path: PageID | Literal["catalog"], byte_position: int) -> None:
 		super().__init__(file_handler, page_sub_path, byte_position)
 	def value(self, increment: int = 0) -> BaseRID:
 		# super().value()
+		val = self._value
 		if self.flushed:
 			raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
 		if increment != 0:
 			self._value += increment 
 			self.dirty = True
-		return BaseRID(self._value)
+		return BaseRID(val)
 
 class PBTailRID(PsuedoBuffIntValue):
 	def __init__(self, file_handler: FileHandler, page_sub_path: PageID | Literal["catalog"], byte_position: int) -> None:
 		super().__init__(file_handler, page_sub_path, byte_position)
 	def value(self, increment: int = 0) -> TailRID:
 		# super().value()
+		val = self._value
 		if self.flushed:
 			raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
 		if increment != 0:
 			self._value += increment 
 			self.dirty = True
-		return TailRID(self._value)
+		return TailRID(val)
 
 U = TypeVar('U')
 V = TypeVar('V')
@@ -174,8 +182,9 @@ class PseudoBuffDictValue(Generic[U, V]):
 		self.dirty = False
 		# self._value = file_handler.read_value(page_sub_path, byte_position, "int")
 	def flush(self) -> None:
-		with open(self.page_path, "wb") as handle:
+		with open(self.page_path, "w+b") as handle:
 			pickle.dump(self._value, handle)
+		handle.close()
 		self.flushed = True
 	def value_get(self) -> dict[U, V]:
 		if self.flushed:
@@ -283,9 +292,11 @@ class FileHandler:
 
 	@staticmethod
 	def write_position(page_path: str, byte_position: int, value: int) -> bool:
-		with open(page_path, "wb") as file:
+		with open(page_path, "r+b") as file:
 			file.seek(byte_position)
+			# file.write(struct.pack(config.PACKING_FORMAT_STR, value))
 			file.write(value.to_bytes(config.BYTES_PER_INT, byteorder="big"))
+		file.close()
 		return True
 
 	# should only be "base" or "tail" path_type
@@ -303,7 +314,7 @@ class FileHandler:
 		curr_offset = self.base_offset.value()
 		# if we can fit all of the remaining physical page data into this page, then only increment
 		# by that value. otherwise, set the offset value to config.PHYSICAL_PAGE_SIZE
-		self.base_offset.value(offset_to_write if curr_offset + offset_to_write <= config.PHYSICAL_PAGE_SIZE else config.PHYSICAL_PAGE_SIZE - curr_offset)
+		# self.base_offset.value(offset_to_write if curr_offset + offset_to_write <= config.PHYSICAL_PAGE_SIZE else config.PHYSICAL_PAGE_SIZE - curr_offset)
 		# old_metadata_pointer_buff = PseudoBuffIntTypeValue[MetadataPageID](self, )
 		self.base_offset.flush() # flush the old offset (this is ahead of what we will write, but it's okay)
 
@@ -311,16 +322,20 @@ class FileHandler:
 		# STEP 2. write whatever we can into this page, both metadata and base
 		p_metadata_1 = self.metadata_path(BaseMetadataPageID(self.next_base_metadata_page_id.value() - 1))
 		offset_written = config.PHYSICAL_PAGE_SIZE - curr_offset
-		with open(p_metadata_1, "wb") as old_metadata_file:
+		with open(p_metadata_1, "r+b") as old_metadata_file:
+			old_metadata_file.seek(0)
 			for i in range(0, config.NUM_METADATA_COL):
 				old_metadata_file.seek(curr_offset, 1) # skip over already written stuff
 				old_metadata_file.write(self.page_to_commit[i][0:offset_written]) 
+		old_metadata_file.close()
 
 		p_base_1 = self.base_path(BasePageID(self.next_base_page_id.value() - 1))
-		with open(p_base_1, "wb") as old_base_file:
+		with open(p_base_1, "r+b") as old_base_file:
+			old_base_file.seek(0)
 			for i in range(config.NUM_METADATA_COL, self.table.total_columns):
 				old_base_file.seek(curr_offset, 1) # skip over already written stuff
 				old_base_file.write(self.page_to_commit[i][0:offset_written])
+		old_base_file.close()
 
 
 		# STEP 3. take the remaining and write it into the next page
@@ -334,36 +349,48 @@ class FileHandler:
 		self.base_offset.add_flush_location(metadata_pointer, config.byte_position.metadata.OFFSET)
 
 
-		with open(self.metadata_path(metadata_pointer), "wb") as new_metadata_file: # open new metadata file
+		with open(self.metadata_path(metadata_pointer), "r+b") as new_metadata_file: # open new metadata file
+			new_metadata_file.seek(0)
 			for i in range(0, config.NUM_METADATA_COL):
 				# the order is swapped because we are adding a new page rather than adding to a page
 				new_metadata_file.write(self.page_to_commit[i][offset_written:]) # config.PHYSICAL_PAGE_SIZE - offset_written
 				new_metadata_file.seek(offset_written, 1) 
+		new_metadata_file.close()
 
-		with open(written_base_page_path, "wb") as file: # open new page file
+		with open(written_base_page_path, "r+b") as file: # open new page file
+			file.seek(0)
 			for i in range(config.NUM_METADATA_COL, len(self.page_to_commit)): # write the data columns
 				file.write(self.page_to_commit[i][offset_written:])
 				file.seek(offset_written, 1)
+		file.close()
 
 		self.page_to_commit = [PhysicalPage()] * self.table.total_columns
 		return True
 
 	def read_value_page_directory(self) -> dict[int, 'PageDirectoryEntry']:
 		page_path = self.page_path("page_directory")
+		ret: dict[int, 'PageDirectoryEntry'] 
 		with open(page_path, "rb") as handle:
-			ret: dict[int, 'PageDirectoryEntry'] = pickle.load(handle) # this is not typesafe at all.... ohwell
-			return ret
+			ret = pickle.load(handle) # this is not typesafe at all.... ohwell
+		handle.close()
+		return ret
 
 	def read_int_value(self, page_sub_path: PageID | Literal["catalog"], byte_position: int) -> int:
 		page_path = self.page_path(page_sub_path)
+		ret: int = 0
 		with open(page_path, "rb") as file:
 			assert byte_position is not None
 			file.seek(byte_position)
-			return int.from_bytes(file.read(8), "big")
+			ret = int.from_bytes(file.read(8), "big")
+		file.close()
+		return ret
 	def read_dict_value(self, page_sub_path: Literal["page_directory", "indices"]) -> dict:
 		page_path = self.page_path(page_sub_path)
+		ret: dict
 		with open(page_path, "rb") as handle:
-			return pickle.load(handle)
+			ret = pickle.load(handle)
+		handle.close()
+		return ret
 
 
 	@staticmethod
@@ -405,6 +432,7 @@ class FileHandler:
 			metadata_file.seek(config.byte_position.metadata.DATA)
 			for i in range(config.NUM_METADATA_COL):
 				metadata_pages[i] = PhysicalPage(data=bytearray(metadata_file.read(config.PHYSICAL_PAGE_SIZE)), offset=offset)
+		metadata_file.close()
 
 		# read selected data
 		with open(path, "rb") as file: 
@@ -416,6 +444,7 @@ class FileHandler:
 				else:
 					# physical_pages.append(None)
 					file.seek(config.PHYSICAL_PAGE_SIZE, 1) # seek 4096 (or size) bytes forward from current position (the 1 means "from current position")
+		file.close()
 		page_type: Literal["base", "tail"] = "base"
 		if isinstance(page_id, TailPageID):
 			page_type = "tail"
@@ -500,7 +529,7 @@ class FileHandler:
 			physical_page = self.page_to_commit[i]	
 			if physical_page is not None:
 				physical_page.insert(cols[i])
-			self.base_offset.value(config.BYTES_PER_INT)
+		self.base_offset.value(config.BYTES_PER_INT)
 		if self.base_offset.value() == config.PHYSICAL_PAGE_SIZE:
 			self.write_new_base_page()	
 		pg_dir_entry = PageDirectoryEntry(BasePageID(self.next_base_page_id.value()), BaseMetadataPageID(self.next_base_metadata_page_id.value()), self.base_offset.value(), "base")
@@ -510,8 +539,8 @@ class FileHandler:
 	def initialize_table_files(self) -> None:
 		# initialize catalog file
 		catalog_path = self.table_file_path("catalog")
-		open(catalog_path, "x")
-		with open(catalog_path, "wb") as catalog_file:
+		open(catalog_path, "xb")
+		with open(catalog_path, "w+b") as catalog_file:
 			helper.write_int(catalog_file, self.table.num_columns)
 			helper.write_int(catalog_file, self.table.key_index)
 			# initialze IDs (page ids, rid)
@@ -519,36 +548,43 @@ class FileHandler:
 			helper.write_int(catalog_file, 2)
 			helper.write_int(catalog_file, 2)
 			helper.write_int(catalog_file, 2)
+		catalog_file.close()
 
 		page_dir_path = self.table_file_path('page_directory')
 		open(page_dir_path, "x")
-		with open(page_dir_path, "wb") as page_directory_file:
+		with open(page_dir_path, "w+b") as page_directory_file:
 			pickle.dump({}, page_directory_file)
 			pass # just create the file, it should be empty
+		page_directory_file.close()
 
 		# final_path=os.path.join(newpath,"page_directory")
 		index_path = self.table_file_path("indices")
 		open(index_path, "x")
-		with open(index_path, "wb") as index_file:
+		with open(index_path, "w+b") as index_file:
 			pickle.dump(Index(self.table.num_columns), index_file)
+		index_file.close()
 
 	def initialize_base_tail_page(self, page_id: BasePageID | TailPageID, metadata_id: BaseMetadataPageID | TailMetadataPageID) -> None:
+		print(f"initializing page id {page_id} of type {type(page_id)}")
 		page_path = self.page_id_to_path(page_id)
-		open(page_path, "x") # create the file
-		with open(page_path, "wb") as base_file:
+		open(page_path, "xb") # create the file
+		with open(page_path, "w+b") as base_file:
+			# base_file.write(metadata_id.to_bytes(config.BYTES_PER_INT, "big"))
 			helper.write_int(base_file, metadata_id) # the first base page points to metadata page 1
 			helper.write_int(base_file, 0) # offset starts at 0
-			helper.write_int(base_file, config.INITIAL_TPS) # TPS starts at 2^64
+			helper.write_int(base_file, config.INITIAL_TPS) # TPS starts at 2**64
 			for _ in range(self.table.num_columns): # write empty physical page for first physical pages
 				base_file.write(bytearray(config.PHYSICAL_PAGE_SIZE))
+		base_file.close()
 
 	def initialize_metadata_file(self, page_id: BaseMetadataPageID | TailMetadataPageID) -> None:
 		page_path = self.page_id_to_path(page_id)
-		open(page_path, "x") 
-		with open(page_path, "wb") as file: # open metadata file
+		open(page_path, "xb") 
+		with open(page_path, "w+b") as file: # open metadata file
 			helper.write_int(file, 0) # starting offset = 0
 			for _ in range(config.NUM_METADATA_COL):
 				file.write(bytearray(config.PHYSICAL_PAGE_SIZE)) # write the metadata columns
+		file.close()
 	
 	def flush(self) -> None:
 		self.write_new_base_page()
@@ -1302,7 +1338,6 @@ class Bufferpool:
 		# self.buffered_physical_pages[index] = None
 		# self.ids_of_physical_pages[index] = None
 		# self.index_of_physical_page_in_the_page[index] = None
-
 
 	def write_to_disk(self, table: Table, index: BufferpoolIndex) -> None:
 		# table_name = self.table_names[index]
