@@ -231,19 +231,20 @@ class FileHandler:
 		self.next_base_metadata_page_id = PBBaseMetadataPageID(self, "catalog", config.byte_position.catalog.LAST_BASE_METADATA_PAGE_ID)
 		self.next_tail_metadata_page_id = PBTailMetadataPageID(self, "catalog", config.byte_position.catalog.LAST_TAIL_METADATA_PAGE_ID)
 		self.next_base_rid = PBBaseRID(self, "catalog", config.byte_position.catalog.LAST_BASE_RID)
+		print(f"next base rid initialized to {self.next_base_rid.value()}")
 		self.next_tail_rid = PBTailRID(self, "catalog", config.byte_position.catalog.LAST_TAIL_ID)
 		# TODO: populate the offset byte with 0 when creating a new page
-		self.base_offset = PsuedoBuffIntValue(self, BasePageID(self.next_base_page_id.value() - 1), config.byte_position.base_tail.OFFSET) # the current offset is based on the last written page
-		self.base_offset.add_flush_location(BaseMetadataPageID(self.next_base_metadata_page_id.value() - 1), config.byte_position.metadata.OFFSET) # flush the offset in the corresponding metadata file along with the base file
-		self.tail_offset = PsuedoBuffIntValue(self, TailPageID(self.next_tail_page_id.value() - 1), config.byte_position.base_tail.OFFSET) # the current offset is based on the last written page
+		self.base_offset = PsuedoBuffIntValue(self, BasePageID(self.next_base_page_id.value()), config.byte_position.base_tail.OFFSET) # the current offset is based on the last written page
+		self.base_offset.add_flush_location(BaseMetadataPageID(self.next_base_metadata_page_id.value()), config.byte_position.metadata.OFFSET) # flush the offset in the corresponding metadata file along with the base file
+		self.tail_offset = PsuedoBuffIntValue(self, TailPageID(self.next_tail_page_id.value()), config.byte_position.base_tail.OFFSET) # the current offset is based on the last written page
 		# t_base = self.read_projected_cols_of_page(BasePageID(self.next_base_page_id.value() - 1)) # could be empty PhysicalPages, to start. but the page files should still exist, even when they are empty
 		# if t_base is None:
 		# 	raise(Exception("the base_page_id just before the next_page_id must have a folder."))
 		# t_tail = self.read_projected_cols_of_page(TailPageID(self.next_base_page_id.value() - 1))
 		# if t_tail is None:
 		# 	raise(Exception("the tail_page_id just before the next_page_id must have a folder."))
-		base_page = self.read_full_page(BasePageID(self.next_base_page_id.value() - 1))
-		tail_page = self.read_full_page(TailPageID(self.next_tail_page_id.value() - 1))
+		base_page = self.read_full_page(BasePageID(self.next_base_page_id.value()))
+		tail_page = self.read_full_page(TailPageID(self.next_tail_page_id.value()))
 		
 		self.base_page_to_commit: Annotated[list[PhysicalPage], self.table.total_columns] = base_page.metadata_physical_pages + base_page.data_physical_pages
 		self.tail_page_to_commit: Annotated[list[PhysicalPage], self.table.total_columns] = tail_page.metadata_physical_pages + tail_page.data_physical_pages
@@ -384,18 +385,20 @@ class FileHandler:
 		assert len(
 			set(map(lambda physicalPage: physicalPage.offset, self.base_page_to_commit))) <= 1
 		
+
+		# WRITE IN THIS PAGE, INITIALIZE NEXT ONE
+
 		# STEP 1. get offset for this page. increment offset to the end
-		offset_to_write = self.base_page_to_commit[0].offset # amount of bytes to write
 		curr_offset = self.base_offset.value()
+		self.base_offset.flush() # flush the old offset (this is ahead of what we will write, but it's okay)
 		# if we can fit all of the remaining physical page data into this page, then only increment
 		# by that value. otherwise, set the offset value to config.PHYSICAL_PAGE_SIZE
 		# self.base_offset.value(offset_to_write if curr_offset + offset_to_write <= config.PHYSICAL_PAGE_SIZE else config.PHYSICAL_PAGE_SIZE - curr_offset)
 		# old_metadata_pointer_buff = PseudoBuffIntTypeValue[MetadataPageID](self, )
-		self.base_offset.flush() # flush the old offset (this is ahead of what we will write, but it's okay)
 
 
 		# STEP 2. write whatever we can into this page, both metadata and base
-		p_metadata_1 = self.metadata_path(BaseMetadataPageID(self.next_base_metadata_page_id.value() - 1))
+		p_metadata_1 = self.metadata_path(BaseMetadataPageID(self.next_base_metadata_page_id.value()))
 		offset_skip = config.PHYSICAL_PAGE_SIZE - curr_offset
 		with open(p_metadata_1, "r+b") as old_metadata_file:
 			old_metadata_file.seek(8)
@@ -404,7 +407,7 @@ class FileHandler:
 				old_metadata_file.seek(offset_skip, 1) # skip over already written stuff
 		old_metadata_file.close()
 
-		p_base_1 = self.base_path(BasePageID(self.next_base_page_id.value() - 1))
+		p_base_1 = self.base_path(BasePageID(self.next_base_page_id.value()))
 		with open(p_base_1, "r+b") as old_base_file:
 			old_base_file.seek(24)
 			for i in range(config.NUM_METADATA_COL, self.table.total_columns):
@@ -412,37 +415,17 @@ class FileHandler:
 				old_base_file.seek(offset_skip, 1) # skip over already written stuff
 		old_base_file.close()
 
+		self.base_page_to_commit = []
+		for i in range(self.table.total_columns):
+			self.base_page_to_commit.append(PhysicalPage(data=bytearray(config.PHYSICAL_PAGE_SIZE), offset=0))
+		# self.base_offset.value_assign(0)
 
-		# STEP 3. take the remaining and write it into the next page
 		written_id = self.next_base_page_id.value(1)
-		written_base_page_path = self.base_path(written_id) 
-
 		metadata_pointer = self.next_base_metadata_page_id.value(1)
 		self.initialize_metadata_file(metadata_pointer)
 		self.initialize_base_tail_page(written_id, metadata_pointer)
 		self.base_offset = PsuedoBuffIntValue(self, written_id, config.byte_position.base_tail.OFFSET)
 		self.base_offset.add_flush_location(metadata_pointer, config.byte_position.metadata.OFFSET)
-
-
-		# with open(self.metadata_path(metadata_pointer), "r+b") as new_metadata_file: # open new metadata file
-		# 	new_metadata_file.seek(8)
-		# 	for i in range(0, config.NUM_METADATA_COL):
-		# 		# the order is swapped because we are adding a new page rather than adding to a page
-		# 		new_metadata_file.seek(curr_offset, 1) 
-		# 		new_metadata_file.write(self.base_page_to_commit[i][curr_offset:]) # config.PHYSICAL_PAGE_SIZE - offset_written
-		# new_metadata_file.close()
-
-		# with open(written_base_page_path, "r+b") as file: # open new page file
-		# 	file.seek(24)
-		# 	for i in range(config.NUM_METADATA_COL, len(self.base_page_to_commit)): # write the data columns
-		# 		file.seek(offset_written, 1)
-		# 		file.write(self.base_page_to_commit[i][offset_written:])
-		# file.close()
-
-		self.base_page_to_commit = []
-		for i in range(self.table.total_columns):
-			self.base_page_to_commit.append(PhysicalPage(data=bytearray(config.PHYSICAL_PAGE_SIZE), offset=0))
-		self.base_offset.value_assign(0)
 		return True
 
 	def read_value_page_directory(self) -> dict[int, 'PageDirectoryEntry']:
@@ -617,9 +600,11 @@ class FileHandler:
 		#print(f"after: {self.base_offset.value()}")
 		#print(f"physical_page_offset = {physical_page.offset} ..--.. base_offset = {self.base_offset.value()}")
 		assert self.base_page_to_commit[0].offset == self.base_offset.value(), f"physical_page_offset = {physical_page.offset} but base_offset = {self.base_offset.value()}"
+		wrote_to_new_page = False
 		if self.base_offset.value() == config.PHYSICAL_PAGE_SIZE:
 			self.write_new_base_page()	
-		pg_dir_entry = PageDirectoryEntry(BasePageID(self.next_base_page_id.value()), BaseMetadataPageID(self.next_base_metadata_page_id.value()), self.base_offset.value(), "base")
+			wrote_to_new_page = True
+		pg_dir_entry = PageDirectoryEntry(BasePageID(self.next_base_page_id.value()), BaseMetadataPageID(self.next_base_metadata_page_id.value()), self.base_offset.value() if not wrote_to_new_page else config.PHYSICAL_PAGE_SIZE - config.BYTES_PER_INT, "base")
 		self.table.page_directory_buff.value_assign(rid, pg_dir_entry)
 		return rid
 
@@ -631,10 +616,12 @@ class FileHandler:
 			helper.write_int(catalog_file, self.table.num_columns)
 			helper.write_int(catalog_file, self.table.key_index)
 			# initialze IDs (page ids, rid)
-			helper.write_int(catalog_file, 2)
-			helper.write_int(catalog_file, 2)
-			helper.write_int(catalog_file, 2)
-			helper.write_int(catalog_file, 2)
+			helper.write_int(catalog_file, 1)
+			helper.write_int(catalog_file, 1)
+			helper.write_int(catalog_file, 1)
+			helper.write_int(catalog_file, 1)
+			helper.write_int(catalog_file, 1)
+			helper.write_int(catalog_file, 1)
 		catalog_file.close()
 
 		page_dir_path = self.table_file_path('page_directory')
