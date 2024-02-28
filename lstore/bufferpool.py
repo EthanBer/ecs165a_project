@@ -992,9 +992,14 @@ class Bufferpool:
 		self.path = path
 		self.curr_clock_hand = 0
 	
+	def get_item(self, key: int, allowed_none = False) -> BufferpoolEntry | None:
+		entry = self.entries[key]
+		return entry
+
+
 	def __getitem__(self, key: int) -> BufferpoolEntry:
 		entry = self.entries[key]
-		assert entry is not None, "tried to get a BufferpoolEntry but it was none (and allow_none was set to its default, False)"
+		assert entry is not None, "tried to get a BufferpoolEntry but it was none (and allow_none was set to its default, False)" 
 		return entry
 	
 	def __setitem__(self, key: int, item: BufferpoolEntry | None) -> None:
@@ -1052,7 +1057,6 @@ class Bufferpool:
 		return table.file_handler.insert_tail_record(metadata, *columns)
 	
 
-
 	def insert_base_record(self, table: Table, record_type: Literal["base", "tail"], metadata: WriteSpecifiedMetadata, *columns: int) -> int: # returns RID of inserted record
 		# table_list = list(filter(lambda table: table.name == table_name, self.tables))
 		# assert len(table_list) == 1
@@ -1091,8 +1095,10 @@ class Bufferpool:
 
 		metadata_buff_indices: List[BufferpoolIndex | BufferpoolSearchResult.TNOT_FOUND] = [-1] * config.NUM_METADATA_COL
 		#column_list = [None] * len(projected_columns_index)
-
+		
 		for i in [BufferpoolIndex(_) for _ in range(config.BUFFERPOOL_SIZE)]: # search the entire bufferpool for columns
+			if self.get_item == None:
+				continue
 			if self[i].physical_page_index == record_page_id:
 				raw_idx = self[i].physical_page_index
 				assert raw_idx is not None, "non None in ids_of_physical_pages but None in index_of_physical_page_in_page?"
