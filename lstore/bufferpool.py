@@ -437,8 +437,34 @@ class FileHandler:
 		return FullFilePageReadResult(filtered_metadata, filtered_data, page_type)
 
 
+	def insert_tail_record(self, metadata: WriteSpecifiedMetadata, *columns:int | None) -> int:
+		total_cols = self.table.total_columns
 
-	def insert_base_record(self, metadata: WriteSpecifiedMetadata, *columns: int | None) -> int: # returns RID of inserted record
+		list_columns: list[int | None] = list(columns)
+		rid = self.next_tail_rid.value(1)
+		list_columns.insert(config.INDIRECTION_COLUMN, metadata.indirection_column)
+		list_columns.insert(config.RID_COLUMN, rid)
+		list_columns.insert(config.TIMESTAMP_COLUMN, int(time.time()))
+		list_columns.insert(config.SCHEMA_ENCODING_COLUMN, metadata.schema_encoding)
+		list_columns.insert(config.NULL_COLUMN, metadata.null_column)
+		list_columns.insert(config.BASE_RID, rid)
+		cols = tuple(list_columns)
+		for i in range(len(self.page_to_commit)):
+			physical_page = self.page_to_commit[i]	
+			if physical_page is not None:
+				physical_page.insert(cols[i])
+			self.offset.value(config.BYTES_PER_INT)
+		if self.offset.value() == config.PHYSICAL_PAGE_SIZE:
+			self.write_new_page(self.page_to_commit, "tail")
+		pg_dir_entry: 'PageDirectoryEntry'
+		pg_dir_entry = PageDirectoryEntry(TailPageID(self.next_base_page_id.value()), MetadataPageID(self.next_metadata_page_id.value()), self.offset.value(), "tail")
+		self.table.page_directory_buff.value_assign(rid, pg_dir_entry)
+
+		return rid
+
+
+
+	def insert_base_record(self, path_type: Literal["base", "tail"], metadata: WriteSpecifiedMetadata, *columns: int | None) -> int: # returns RID of inserted record
 		null_bitmask = 0
 		total_cols = self.table.total_columns
 		if metadata.indirection_column == None: # set 1 for null indirection column
@@ -823,7 +849,6 @@ class Bufferpool:
 
 	# buffered_physical_pages: dict[int, Buffered[PhysicalPage]] = {}
 	TProjected_Columns = List[Literal[0, 1]]
-	# TODO: flush catalog information, like last_base_page_id, to disk before closing
 	def __init__(self, path: str) -> None: 
 		# self.buffered_metadata: Annotated[list[list[PhysicalPage], config.BUFFERPOOL_SIZE]]  = [[]]
 		# self.buffered_metadata: Annotated[list[list[PhysicalPage]], config.BUFFERPOOL_SIZE] = [[]]
@@ -854,12 +879,14 @@ class Bufferpool:
 		self.entries[key] = item
 
 	def close_bufferpool(self) -> None:
+		
 		for i in [BufferpoolIndex(_) for _ in range(config.BUFFERPOOL_SIZE)]:
-			if self[i].dirty_bit==True:
-				table = self[i].table
-				self.write_to_disk(table, i)
-			self.change_bufferpool_entry(None,i)
-			# bufferpool_entry=BufferpoolEntry(0, None, False,  None,  None,  None,  None)
+			if self.entries[i]!=None:
+				if self[i].dirty_bit==True:
+					table = self[i].table
+					self.write_to_disk(table, i)
+				self.change_bufferpool_entry(None,i)
+				# bufferpool_entry=BufferpoolEntry(0, None, False,  None,  None,  None,  None)
 		
 
 	def change_bufferpool_entry(self, entry: BufferpoolEntry | None, buff_idx: BufferpoolIndex) -> None:
@@ -897,12 +924,16 @@ class Bufferpool:
 		for idx in buff_indices:
 			self[idx].pin_count += change
 
+	
+	def insert_tail_record(self, table: Table, metadata: WriteSpecifiedMetadata, *columns: int | None) -> int: # Returns the RID of the inserted record
+		return table.file_handler.insert_tail_record(metadata, *columns)
 
-	def insert_record(self, table: Table, record_type: Literal["base", "tail"], metadata: WriteSpecifiedMetadata, *columns: int) -> int: # returns RID of inserted record
+
+	def insert_base_record(self, table: Table, record_type: Literal["base", "tail"], metadata: WriteSpecifiedMetadata, *columns: int) -> int: # returns RID of inserted record
 		# table_list = list(filter(lambda table: table.name == table_name, self.tables))
 		# assert len(table_list) == 1
 		# table = table_list[0]
-		return table.file_handler.insert_base_record(metadata, *columns)
+		return table.file_handler.insert_base_record(record_type, metadata, *columns)
 
 	# returns whether the requested portion of record is in the bufferpool, 
 	# and the bufferpool indices of any column of the record found (regardless of whether it was)
@@ -1005,6 +1036,35 @@ class Bufferpool:
 				self.change_bufferpool_entry(BufferpoolEntry(0, physical_page, False, Bufferpool.make_page_id(page_id, bufferpool_page_type), i, page_type, table), new_buff_idx)
 		return True
 			# self.pin_counts[new_buff_idx] = 0 # initialize to
+	
+
+	def delete_nth_record(self, table : Table, page_id: PageID, offset :int) -> bool:
+		bitmask = table.ith_total_col_shift(config.RID_COLUMN)
+		null_column_marked=False
+		rid_column_marked=False
+		for entry in self.entries:
+			if entry is not None and entry.physical_page_id == page_id and entry.physical_page_index == config.NULL_COLUMN:
+				entry.physical_page.data[offset:offset+8] = int.to_bytes(bitmask)
+				null_column_marked=True
+			if entry is not None and entry.physical_page_id == page_id and entry.physical_page_index == config.RID_COLUMN:
+				entry.physical_page.data[offset:offset+8] = int.to_bytes(0)
+				rid_column_marked=True
+		return rid_column_marked & null_column_marked
+				
+	
+	def update_nth_record(self, page_id : PageID, offset: int, col_idx: int, new_value: int) -> bool:
+		record_column_entry = None
+
+		for entry in self.entries:
+			if entry is not None and entry.physical_page_id == page_id and entry.physical_page_index == col_idx:
+				record_column_entry = entry
+		
+		if record_column_entry is None: 
+			return False
+
+		record_column_entry.physical_page.data[offset: offset+8] = int.to_bytes(new_value)
+
+		return True
 
 
 	def get_updated_col(self, table: Table, record: Record, col_idx: DataIndex) -> int | None:

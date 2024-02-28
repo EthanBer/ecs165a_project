@@ -12,6 +12,6 @@ query = Query(grades_table)
 query.insert(*[1, 2, 3, 4, 5])
 db.close()
 # records = {}
-
+#db.close()
 # number_of_records = 1000
 # number_of_aggregates = 100
