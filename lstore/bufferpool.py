@@ -765,14 +765,14 @@ class Table:
 	#     pass
 
 	# TODO: uncomment
-	"""
+
 	
 	def bring_base_pages_to_memory(self)-> None:
-		list_base_pages=[]
-		for table_name in os.listdir(self.path):
-			if self.table_name==table_name:
-				table_path=os.path.join(self.path,table_name)
-				catalog_path = os.path.join(self.path,"catalog")
+		#list_base_pages=[]
+		for table_name in os.listdir(self.db_path):
+			if self.name==table_name:
+				table_path=os.path.join(self.db_path,table_name)
+				catalog_path = os.path.join(self.db_path,"catalog")
 				with open(catalog_path, 'rb') as catalog:
 					#get the catalog to create the table 
 					table_num_columns= int.from_bytes(catalog.read(8))
@@ -781,7 +781,7 @@ class Table:
 					table_last_page_id = int.from_bytes(catalog.read(8))
 					table_last_tail_id= int.from_bytes(catalog.read(8))
 					table_last_rid= int.from_bytes(catalog.read(8))
-					
+				
 				for file in os.listdir(table_path):
 					if file =="*page*":
 						page_id=int(file.split("_")[1]) # take the page id, may not work :( 
@@ -814,35 +814,39 @@ class Table:
 									
 		#                             physical_page_data = bytearray(physical_page_information)
 		#                             physical_page = PhysicalPage(physical_page_data,offset)
-						file_page_read_result=FileHandler.read_page(page_id,[1]*table_num_columns,[1]*config.NUM_METADATA_COL)     
-
-
 						
-						self.get_updated_base_page(file_page_read_result,page_id)
-				
-				#page directory update 
-			
+						file_page_read_result=self.file_handler.read_full_page(BasePageID(page_id))     
+
+						data = file_page_read_result.data_physical_pages
+						metadata = file_page_read_result.metadata_physical_pages
+						file_result = FilePageReadResult(metadata, data, 'base')
+						
+						self.get_updated_base_page(file_result, BasePageID(page_id))
 
 	
 	def merge(self):
 		list_base_page=self.bring_base_pages_to_memory()
 		pass
 
-	def get_updated_base_page(self,file_page_read_result: FilePageReadResult,page_id: PageID) -> None:
-		object_to_get_tps=PseudoBuffDictValue(FileHandler,page_id,config.TPS)
-		tps=self.get_updated_base_page(file_page_read_result,object_to_get_tps.value())
-		
+	def get_updated_base_page(self,file_page_read_result: FilePageReadResult,page_id: BasePageID) -> None:
+		object_to_get_tps=PsuedoBuffIntValue(self.file_handler, page_id, config.byte_position.base_tail.TPS)
+		#tps=self.get_updated_base_page(file_page_read_result,object_to_get_tps.value())
+		tps=object_to_get_tps.value()
 		physical_pages=file_page_read_result.data_physical_pages
 		metadata=file_page_read_result.metadata_physical_pages
 		total_columns=len(physical_pages)+ len(metadata)
-		offset=physical_pages[0].offset 
+		if physical_pages[0] is not None:
+			offset=physical_pages[0].offset 
 		num_records=offset/8
 
-		for i in range(num_records):
+		for i in range(int(num_records)):
 			for j in range(len(physical_pages)): #iterate through all the columns of a record
-				indirection_column=metadata[config.INDIRECTION_COLUMN].data[8*i : 8*(i+1)]
-				schema_encoding=metadata[config.SCHEMA_ENCODING_COLUMN].data[8*i : 8*(i+1)]
-				null_column=metadata[config.NULL_COLUMN].data[8*i : 8*(i+1)]
+				not_null_indirection_column=helper.not_null(metadata[config.INDIRECTION_COLUMN])
+				indirection_column=not_null_indirection_column.data[8*i : 8*(i+1)]
+				not_null_schema_encoding=helper.not_null(metadata[config.SCHEMA_ENCODING_COLUMN])
+				schema_encoding=not_null_schema_encoding.data[8*i : 8*(i+1)]
+				not_null_null_column=helper.not_null(metadata[config.NULL_COLUMN])
+				null_column=not_null_null_column.data[8*i : 8*(i+1)]
 
 
 				tail_indirection_column=indirection_column
@@ -853,37 +857,43 @@ class Table:
 				tail_null_column=null_column
 
 				## check tps 
-				if tail_indirection_column<tps:
+				if int.from_bytes(tail_indirection_column) < tps:
 					break
 				## check if deleted 
-				if tail_null_column & 1 << (total_columns-j)!=0: ## check this 
+				if int.from_bytes(tail_null_column) & 1 << (total_columns-j)!=0: ## check this 
 					break
 			
-				while tail_schema_encoding & 1 << (total_columns-j)!=0: #column has been updated
+				while int.from_bytes(tail_schema_encoding) & 1 << (total_columns-j)!=0: #column has been updated
 				#loop for retreiving information not updated 
-					tail_page_directory_entry = self.page_directory_buff[tail_indirection_column]
+					tail_page_directory_entry = self.page_directory_buff[int.from_bytes(tail_indirection_column)]
 					tail_offset=tail_page_directory_entry.offset
 					tail_page_id = tail_page_directory_entry.page_id  ## tail page id 
 					
-					tail=FileHandler.read_page(tail_page_id,[1]*len(physical_pages),[1]*len(metadata))
+					tail=self.file_handler.read_full_page(tail_page_id)
 					
 					tail_physical_page=tail.data_physical_pages
 					tail_metadata_page=tail.metadata_physical_pages
-					tail_indirection_column=tail_metadata_page[config.INDIRECTION_COLUMN].data[8*tail_offset: 8*(tail_offset+1)]
-					tail_schema_encoding=tail_metadata_page[config.SCHEMA_ENCODING_COLUMN].data[8*tail_offset : 8*(tail_offset+1)]
-					tail_null_column=metadata[config.NULL_COLUMN].data[8*tail_offset : 8*(tail_offset+1)]
-					
 
-				physical_pages[j].data[8*i : 8*(i+1)]=tail_physical_page[i].data[tail_offset*8:(tail_offset+1)*8]
+					not_none_tail_indirection_column=helper.not_null(tail_metadata_page[config.INDIRECTION_COLUMN])
+					tail_indirection_column=not_none_tail_indirection_column.data[8*tail_offset: 8*(tail_offset+1)]
+					not_none_tail_schema_encoding=helper.not_null(tail_metadata_page[config.SCHEMA_ENCODING_COLUMN])
+					tail_schema_encoding=not_none_tail_schema_encoding.data[8*tail_offset : 8*(tail_offset+1)]
+					not_none_tail_null_column=helper.not_null(metadata[config.NULL_COLUMN])
+					tail_null_column=not_none_tail_null_column.data[8*tail_offset : 8*(tail_offset+1)]
+					
+				not_null_physical_pages = helper.not_null(physical_pages[j])
+				not_tail_physical_pages = helper.not_null(tail_physical_page[i])
+				not_null_physical_pages.data[8*i : 8*(i+1)]=not_tail_physical_pages.data[tail_offset*8:(tail_offset+1)*8]
 		#change schema encoding of the updated entry of the base page 
-			metadata[config.SCHEMA_ENCODING_COLUMN].data[i*8:8*(i+1)]=0
+			please_give_us_an_A = helper.not_null(metadata[config.SCHEMA_ENCODING_COLUMN])
+			please_give_us_an_A.data[i*8:8*(i+1)]=0
 		
 		final_physical_pages=metadata+physical_pages
 		#create new base page file with the updated information
-		FileHandler.write_new_page(final_physical_pages, "base")
-		object_to_get_tps._value=indirection_column
+		self.file_handler.write_new_base_page()
+		object_to_get_tps._value = int.from_bytes(indirection_column)
 		object_to_get_tps.flush()
-	"""
+
 
 
 
@@ -1007,7 +1017,7 @@ class Bufferpool:
 		self.path = path
 		self.curr_clock_hand = 0
 	
-	def get_item(self, key: int, allowed_none: bool = False) -> BufferpoolEntry | None:
+	def get_item(self, key: int) -> BufferpoolEntry | None:
 		entry = self.entries[key]
 		return entry
 
@@ -1113,11 +1123,11 @@ class Bufferpool:
 
 		metadata_buff_indices: List[BufferpoolIndex | BufferpoolSearchResult.TNOT_FOUND] = [-1] * config.NUM_METADATA_COL
 		#column_list = [None] * len(projected_columns_index)
-		
+
 		for i in [BufferpoolIndex(_) for _ in range(config.BUFFERPOOL_SIZE)]: # search the entire bufferpool for columns
 			if self.maybe_get_entry(i) is None:
 				continue
-			if self[i].physical_page_index == record_page_id:
+			elif self[i].physical_page_index == record_page_id:
 				raw_idx = self[i].physical_page_index
 				assert raw_idx is not None, "non None in ids_of_physical_pages but None in index_of_physical_page_in_page?"
 				data_idx = raw_idx.toDataIndex()

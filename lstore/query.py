@@ -171,7 +171,7 @@ class Query:
             rid = self.table.index.locate(search_key_index, search_key)
             if rid is not None:
                 record = self.db_bpool.get_updated_record(self.table, rid, [1] * self.table.num_columns)
-                assert record is not None, "record was not none even though rid was none"
+                assert record is not None, "record was none even though rid was not none"
                 valid_records.append(record)
                 # #print(f"record cols was {valid_records[0].columns}")
         else:
