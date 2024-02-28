@@ -48,6 +48,9 @@ class PhysicalPage:
         self.data = data
         self.offset = offset
 
+    def has_capacity(self) -> bool:
+        return self.size > self.offset
+
     def insert(self, value: int | None) -> None:
         # Pack the 64-bit integer into bytes (using '>Q' format for unsigned long long with big endian)
         packed_data = struct.pack(config.PACKING_FORMAT_STR, 0 if value is None else value)

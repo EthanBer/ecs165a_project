@@ -8,7 +8,7 @@ import typing
 import glob
 import os
 
-from lstore import file_handler
+# from lstore import file_handler
 from lstore.index import Index
 from lstore.page_directory_entry import BaseMetadataPageID, BasePageID, BaseRID, MetadataPageID, PageDirectoryEntry, PageID, TailMetadataPageID, TailPageID, TailRID
 from lstore.ColumnIndex import DataIndex, RawIndex
@@ -202,7 +202,8 @@ class PseudoBuffDictValue(Generic[U, V]):
 		return self._value
 	def __del__(self) -> None:
 		if not self.flushed and self.dirty:
-			raise(Exception("unflushed dict buffer value"))
+			#print("I AM A PROBLEMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM " , self.value_get())
+			raise(Exception("unflushed dict buffer value "))
 
 class FileHandler:
 	def __init__(self, table: Table) -> None: # path is the database-level path
@@ -298,6 +299,75 @@ class FileHandler:
 			file.write(value.to_bytes(config.BYTES_PER_INT, byteorder="big"))
 		file.close()
 		return True
+
+
+	def write_new_tail_page(self) -> bool:
+			# check that physical page sizes and offsets are the same
+		assert len(
+			set(map(lambda physicalPage: physicalPage.size, self.page_to_commit))) <= 1
+		assert len(
+			set(map(lambda physicalPage: physicalPage.offset, self.page_to_commit))) <= 1
+		
+		# STEP 1. get offset for this page. increment offset to the end
+		offset_to_write = self.page_to_commit[0].offset # amount of bytes to write
+		curr_offset = self.tail_offset.value()
+		# if we can fit all of the remaining physical page data into this page, then only increment
+		# by that value. otherwise, set the offset value to config.PHYSICAL_PAGE_SIZE
+		# self.base_offset.value(offset_to_write if curr_offset + offset_to_write <= config.PHYSICAL_PAGE_SIZE else config.PHYSICAL_PAGE_SIZE - curr_offset)
+		# old_metadata_pointer_buff = PseudoBuffIntTypeValue[MetadataPageID](self, )
+		self.tail_offset.flush() # flush the old offset (this is ahead of what we will write, but it's okay)
+
+
+		# STEP 2. write whatever we can into this page, both metadata and tail
+		p_metadata_1 = self.metadata_path(TailMetadataPageID(self.next_tail_metadata_page_id.value() - 1))
+		offset_written = config.PHYSICAL_PAGE_SIZE - curr_offset
+		with open(p_metadata_1, "r+b") as old_metadata_file:
+			old_metadata_file.seek(8)
+			for i in range(0, config.NUM_METADATA_COL):
+				old_metadata_file.seek(curr_offset, 1) # skip over already written stuff
+				old_metadata_file.write(self.page_to_commit[i][0:offset_written]) 
+		old_metadata_file.close()
+
+		p_tail_1 = self.tail_path(TailPageID(self.next_tail_page_id.value() - 1))
+		with open(p_tail_1, "r+b") as old_tail_file:
+			old_tail_file.seek(24)
+			for i in range(config.NUM_METADATA_COL, self.table.total_columns):
+				old_tail_file.seek(curr_offset, 1) # skip over already written stuff
+				old_tail_file.write(self.page_to_commit[i][0:offset_written])
+		old_tail_file.close()
+
+
+		# STEP 3. take the remaining and write it into the next page
+		written_id = self.next_tail_page_id.value(1)
+		written_tail_page_path = self.tail_path(written_id) 
+
+		metadata_pointer = self.next_tail_metadata_page_id.value(1)
+		self.initialize_metadata_file(metadata_pointer)
+		self.initialize_base_tail_page(written_id, metadata_pointer)
+		self.tail_offset = PsuedoBuffIntValue(self, written_id, config.byte_position.base_tail.OFFSET)
+		self.tail_offset.add_flush_location(metadata_pointer, config.byte_position.metadata.OFFSET)
+
+
+		with open(self.metadata_path(metadata_pointer), "r+b") as new_metadata_file: # open new metadata file
+			new_metadata_file.seek(8)
+			for i in range(0, config.NUM_METADATA_COL):
+				# the order is swapped because we are adding a new page rather than adding to a page
+				new_metadata_file.write(self.page_to_commit[i][offset_written:]) # config.PHYSICAL_PAGE_SIZE - offset_written
+				new_metadata_file.seek(offset_written, 1) 
+		new_metadata_file.close()
+
+		with open(written_tail_page_path, "r+b") as file: # open new page file
+			file.seek(24)
+			for i in range(config.NUM_METADATA_COL, len(self.page_to_commit)): # write the data columns
+				file.write(self.page_to_commit[i][offset_written:])
+				file.seek(offset_written, 1)
+		file.close()
+
+		self.page_to_commit = [PhysicalPage()] * self.table.total_columns
+		return True
+
+
+
 
 	# should only be "base" or "tail" path_type
 	# 
@@ -528,7 +598,12 @@ class FileHandler:
 		for i in range(len(self.page_to_commit)):
 			physical_page = self.page_to_commit[i]	
 			if physical_page is not None:
-				physical_page.insert(cols[i])
+				if physical_page.has_capacity():
+					physical_page.insert(cols[i])
+				else:
+					
+					self.write_new_base_page()
+					
 		self.base_offset.value(config.BYTES_PER_INT)
 		if self.base_offset.value() == config.PHYSICAL_PAGE_SIZE:
 			self.write_new_base_page()	
