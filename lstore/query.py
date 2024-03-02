@@ -130,6 +130,13 @@ class Query:
         # #print(f"trying to insert {columns}")
         rid = self.table.file_handler.insert_base_record(WriteSpecifiedMetadata(None, 0b0, None),
                                                                      *columns)
+        print(f"trying to insert rid = {rid}")
+        if rid == 511:
+            print(f"rid 511 was {columns}")
+        if rid == 512:
+            print(f"rid 512 was {columns}")
+        if rid == 513:
+            print(f"rid 513 was {columns}")
         # #print(f"rid: {rid}")
 
         # if rid == -1:
@@ -180,50 +187,15 @@ class Query:
                 record = self.db_bpool.get_updated_record(self.table, rid, [1] * self.table.num_columns)
                 assert record is not None
                 assert record.metadata.rid == rid
+                assert record.metadata.rid is not None
                 dir_entry = self.table.page_directory_buff[record.metadata.rid]
                 if dir_entry.page_type != "base":
                     continue
-                print(f"considering record {record.columns}")
-                # #print(f"record cols was {record.columns}")
-                # search_key_col: int | None = record[search_key_index]  # default to base page
-                # if rec[search_key_index] == search_key:
-                #     valid_records.append(rec)
-                #     valid_records.append(rid)
-
-                # get the latest version
-                # col_list = list(record.columns)
-
-                # DO WE NEED THIS?? BECAUSE WE DID get_updated_record we can assume that this is also updated
-                # search_key_col = self.get_updated_col(record, search_key_index)
                 search_key_col = self.db_bpool.get_updated_col(self.table, record, DataIndex(search_key_index))
-                print(search_key_col)
-
-                # schema_encoding = record.schema_encoding
-                # if helper.ith_bit(schema_encoding, self.table.num_columns, search_key_index,
-                #                   False) == 0b1:  # check if the column has been updated.
-                #     # #print("detected on schema encoding bit")
-                #     assert record.indirection_column is not None, "inconsistent state: schema_encoding bit on but indirection was None"
-                #     curr_rid = record.indirection_column
-                #     curr_schema_encoding = self.table.get_record_by_rid(curr_rid).schema_encoding
-                #     while helper.ith_bit(curr_schema_encoding, self.table.num_columns, search_key_index, False) == 0b0:
-                #         # #print(f"schema encoding {curr_schema_encoding} indicates this record doesn't have the data. ")
-                #         temp = self.table.get_record_by_rid(curr_rid)
-                #         assert temp.indirection_column is not None
-                #         curr_rid = temp.indirection_column
-                #         curr_schema_encoding = self.table.get_record_by_rid(curr_rid).schema_encoding
-                #         # curr_rid, curr_schema_encoding = temp.indirection_column, temp.schema_encoding
-                #         # curr_indirection = temp
-                #     # if self.table.get_record_by_rid(curr_rid)[search_key_index] == search_key:
-                #     search_key_col = self.table.get_record_by_rid(curr_rid)[search_key_index]
-                # # assert search_key_col is not None,
+                # print(f"considering rid {rid}, its col was {search_key_col}. looking for {search_key}")
                 if search_key_col == search_key:
                     valid_records.append(record)
-                #  #print(f"appending valid record with columns {record.columns}")
-                # else:
-                #  #   #print(
-                #  #       f"searched record, its columns {record.columns} was {search_key_col} but wanted {search_key}, moving on")
-                #     pass
-            last_base_rid.flush()
+            # last_base_rid_buff.flush()
         
         for record in valid_records:
             col_list = list(record.columns)
@@ -308,7 +280,6 @@ class Query:
                 if search_key_col == search_key:
                     valid_records.append(rec)
                 #     valid_records.append(rid)
-            last_base_rid.flush()
         
         for record in valid_records:
             col_list = list(record.columns)

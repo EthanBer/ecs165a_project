@@ -48,7 +48,8 @@ class Database():
         for table in self.tables:
             print("Im the table: ", table.name)
             table.page_directory_buff.flush()
-            table.file_handler.write_new_base_page()
+            # table.file_handler.write_new_base_page()
+            print("flushed file handler")
             table.file_handler.flush()
         self.bpool.close_bufferpool()
         self.tables.clear()

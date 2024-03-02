@@ -61,7 +61,6 @@ class PhysicalPage:
     def has_capacity(self, n: int = 1) -> bool:  # check capacity for n more records
         return self.offset + (config.BYTES_PER_INT * n) <= config.PHYSICAL_PAGE_SIZE
 
-
     def __getitem__(self, val: slice) -> bytearray:
         return self.data[val.start:val.stop]
     
