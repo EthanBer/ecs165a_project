@@ -66,7 +66,8 @@ class Database():
     def create_table(self, name : str, num_columns : int, key_index: int) -> Table:
         key_index = DataIndex(key_index)
         table_path = os.path.join(self.path, name)
-        os.mkdir(table_path)
+        if not os.path.isdir(table_path):
+            os.mkdir(table_path)
         table = Table(name, num_columns, key_index, self.path, self.bpool)
         self.tables.append(table)
 
