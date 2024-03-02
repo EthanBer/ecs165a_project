@@ -233,7 +233,7 @@ class FileHandler:
 		self.next_tail_metadata_page_id = PBTailMetadataPageID(self, "catalog", config.byte_position.catalog.LAST_TAIL_METADATA_PAGE_ID)
 		self.next_base_rid = PBBaseRID(self, "catalog", config.byte_position.catalog.LAST_BASE_RID)
 		print(f"next base rid initialized to {self.next_base_rid.value()}")
-		self.next_tail_rid = PBTailRID(self, "catalog", config.byte_position.catalog.LAST_TAIL_ID)
+		self.next_tail_rid = PBTailRID(self, "catalog", config.byte_position.catalog.LAST_TAIL_RID)
 		# TODO: populate the offset byte with 0 when creating a new page
 		self.base_offset = PsuedoBuffIntValue(self, BasePageID(self.next_base_page_id.value()), config.byte_position.base_tail.OFFSET) # the current offset is based on the last written page
 		self.base_offset.add_flush_location(BaseMetadataPageID(self.next_base_metadata_page_id.value()), config.byte_position.metadata.OFFSET) # flush the offset in the corresponding metadata file along with the base file
@@ -796,8 +796,10 @@ class BufferedRecord:
 			self.buff_indices.remove(buff_idx)
 
 	def get_value(self) -> Record:
-		metadata_cols: List[PhysicalPage] = []
-		data_cols: List[PhysicalPage] = []
+		num_cols = len(self.projected_columns_index) # number of data_cols
+		# will be set to none if that physical page is not in the projected columns
+		metadata_cols: Annotated[List[PhysicalPage], num_cols] = [] # no record should have partial metadata.  
+		data_cols: Annotated[List[PhysicalPage | None], num_cols] = [None] * num_cols
 		for buff_idx in self.buff_indices:
 			col_idx = self.bufferpool[buff_idx].physical_page_index
 			assert col_idx is not None, "column held by BufferedRecord was None!"
@@ -806,12 +808,12 @@ class BufferedRecord:
 			if col_idx < config.NUM_METADATA_COL: # this is metadata column
 				metadata_cols.append(physical_page)
 			else:
-				data_cols.append(physical_page)
+				data_cols[col_idx.toDataIndex()] = physical_page
 
 		all_cols = metadata_cols + data_cols
 
 		def get_no_none_check(col_idx: RawIndex, record_offset: int) -> int:
-			return helper.unpack_data(all_cols[col_idx].data, record_offset)
+			return helper.unpack_data(helper.not_null(all_cols[col_idx]).data, record_offset)
 		def get_check_for_none(col_idx: RawIndex, record_offset: int) -> int | None:
 			# val = all_cols[col_idx][record_offset]
 			# val = int.from_bytes(all_cols[col_idx].data[record_offset:record_offset+config.BYTES_PER_INT], byteorder="big")
@@ -819,7 +821,7 @@ class BufferedRecord:
 			# # #print("getting checking null")
 			if val == 0:
 				# breaking an abstraction barrier for convenience right now. TODO: fix?
-				thing = helper.unpack_data(all_cols[config.NULL_COLUMN].data, record_offset)
+				thing = helper.unpack_data(helper.not_null(all_cols[config.NULL_COLUMN]).data, record_offset)
 				# thing = helper.unpack_col(self, config.NULL_COLUMN, record_offset / config.BYTES_PER_INT)
 				# thing = struct.unpack(config.PACKING_FORMAT_STR, self.physical_pages[config.NULL_COLUMN].data[(record_idx * 8):(record_idx * 8)+8])[0]
 				# is_none = (self.physical_pages[config.NULL_COLUMN].data[(record_idx * 8):(record_idx * 8)+8] == b'x01')
@@ -831,12 +833,11 @@ class BufferedRecord:
 			return val
 			
 
-		indirection_column, rid, schema_encoding, timestamp, key_col, null_col, base_rid = \
+		indirection_column, rid, schema_encoding, timestamp,  null_col, base_rid = \
 			get_check_for_none(config.INDIRECTION_COLUMN, self.record_offset), \
 			get_check_for_none(config.RID_COLUMN, self.record_offset), \
 			get_no_none_check(config.SCHEMA_ENCODING_COLUMN, self.record_offset), \
 			get_no_none_check(config.TIMESTAMP_COLUMN, self.record_offset), \
-			get_check_for_none(helper.data_to_raw_idx(self.table.key_index), self.record_offset), \
 			get_check_for_none(config.NULL_COLUMN, self.record_offset), \
 			get_no_none_check(config.BASE_RID, self.record_offset), \
 
@@ -849,7 +850,20 @@ class BufferedRecord:
 		elif page_type == "metadata":
 			raise(Exception("should not be getting metadata page type in get_record."))
 
-		return Record(FullMetadata(rid, timestamp, indirection_column,schema_encoding, null_col, base_rid), is_base_page, *[helper.unpack_data(data_col.data, self.record_offset) for data_col in data_cols])
+
+		columns: Annotated[List[int | None], num_cols] = [None] * num_cols
+
+		# the data_cols variable contains only the data columns in the order they 
+		# were specified in the projected_columns.
+		j = 0
+		for i, proj in enumerate(self.projected_columns_index):
+			if proj == 1:
+				data_col = data_cols[i]
+				assert data_col is not None, "this record is missing a column specified in the projected_columns_index"
+				columns[i] = helper.unpack_data(data_col.data, self.record_offset)
+				j += 1
+
+		return Record(FullMetadata(rid, timestamp, indirection_column,schema_encoding, null_col, base_rid), is_base_page, *columns)
 				
 class Bufferpool:
 	# buffered_physical_pages: list[Buffered[PhysicalPage]] = []
@@ -933,6 +947,7 @@ class Bufferpool:
 		return table.file_handler.insert_base_record(metadata, *columns)
 
 	def insert_tail_record(self, table: Table, metadata: WriteSpecifiedTailMetadata, *columns: int | None) -> int:
+		print(f"inserting tail record metadata {metadata} and columns {columns}")
 		return table.file_handler.insert_tail_record(metadata, *columns)
 
 	# returns whether the requested portion of record is in the bufferpool, 
@@ -1047,7 +1062,7 @@ class Bufferpool:
 			# self.change_bufferpool_entry(BufferpoolEntry(0, ))
 
 		## now, we can actually update the value now that we know it's in the bufferpool
-		self[buff_idx].physical_page.data[page_dir_entry.offset:page_dir_entry.offset+config.PHYSICAL_PAGE_SIZE] = helper.encode(new_value) 
+		self[buff_idx].physical_page.data[page_dir_entry.offset:page_dir_entry.offset+config.BYTES_PER_INT] = helper.encode(new_value) 
 		self[buff_idx].dirty_bit = True # the value has been changed, it should be dirty
 
 		return True
@@ -1084,7 +1099,7 @@ class Bufferpool:
 			proj_col[col_idx] = 1 # only get the desired column
 			curr_record = self.get_record(table, curr_rid, proj_col)
 			assert curr_record is not None, "a record with a non-None RID was not found"
-			curr_schema_encoding = curr_record.get_value().metadata.schema_encoding
+			curr_schema_encoding = curr_record.get_value().metadata.schema_encoding ## this schema encoding doesn't work properly
 			while helper.ith_bit(curr_schema_encoding, table.num_columns, col_idx, False) == 0b0: # while not found
 				assert curr_record is not None, "a record with a non-None RID was not found"
 				curr_rid = curr_record.get_value().metadata.indirection_column
@@ -1156,7 +1171,7 @@ class Bufferpool:
 
 	# THIS FUNCTION RECEIVES ONLY **BASE** RECORDS
 	def get_updated_record(self, table: Table, record_id: int, projected_columns_index: list[Literal[0] | Literal[1]]) -> Record | None:
-		table.file_handler.flush()
+		# table.file_handler.flush()
 		# table: Table = next(table for table in self.tables if table.name == table_name)
 
 		# If there are multiple writers we probably need a lock here so the indirection column is not modified after we get it
@@ -1301,7 +1316,7 @@ class Bufferpool:
 		assert record_offset is not None
 
 		# filtering out the -1s should be the same as taking out the Nones
-		# ie taking out all not founds should leave us with all columns
+		# ie taking out all not requesteds should leave us with all columns
 		filtered_data_buff_indices =  [idx for idx in data_buff_indices if (idx != -1) and (isinstance(idx, BufferpoolIndex)) ]
 		filtered_metadata_buff_indices =  [idx for idx in metadata_buff_indices if (idx != -1) and (isinstance(idx, BufferpoolIndex)) ]
 		relevant_data_buff_indices = [idx for idx in data_buff_indices if idx is not None]
@@ -1325,7 +1340,7 @@ class Bufferpool:
 			if self.maybe_get_entry(i) is None:
 				return i
 			if self[i].pin_count == 0:
-				if self[i].dirty_bit == 1: 
+				if self[i].dirty_bit == True: 
 					self.write_to_disk(self[i].table, i)
 				self.remove_from_bufferpool(i) # remove from the buffer without writing in disk
 				return i
@@ -1356,7 +1371,7 @@ class Bufferpool:
 		physical_page = self[physical_page_index].physical_page
 		assert physical_page is not None
 		path = os.path.join(self.path, table.file_handler.page_id_to_path(page_id))
-		with open(path, 'wb') as file:
+		with open(path, 'r+b') as file:
 			file.seek(physical_page_index.toDataIndex() * config.PHYSICAL_PAGE_SIZE)
 			if self[index].physical_page != None:
 				file.write(physical_page.data)

@@ -435,8 +435,10 @@ class Query:
         #                                                        config.SCHEMA_ENCODING_COLUMN,
         #                                                        base_schema_encoding)
         
-        success = self.db_bpool.update_col_record_inplace(self.table, BaseRID(base_page_dir_entry.page_id), config.SCHEMA_ENCODING_COLUMN, base_schema_encoding)
+        success = self.db_bpool.update_col_record_inplace(self.table, BaseRID(base_record.metadata.rid), config.SCHEMA_ENCODING_COLUMN, base_schema_encoding)
         assert success, "update not successful"
+
+        r = self.db_bpool.get_record(self.table, BaseRID(base_record.metadata.rid), [1] * self.table.num_columns)
         
         return success
 

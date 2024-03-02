@@ -51,7 +51,7 @@ class config:
 			LAST_BASE_METADATA_PAGE_ID = 4*8
 			LAST_TAIL_METADATA_PAGE_ID = 5*8
 			LAST_BASE_RID = 6*8
-			LAST_TAIL_ID = 7*8
+			LAST_TAIL_RID = 7*8
 
 	BYTES_PER_INT = 8	
 
@@ -80,4 +80,4 @@ class WriteSpecifiedTailMetadata:
 		self.base_rid = base_rid
 		self.indirection_column = indirection_column
 		self.schema_encoding = schema_encoding
-		# self.null_column = null_column
+		self.null_column = null_column

@@ -56,6 +56,7 @@ for key in records:
 		original = records[key].copy()
 		# update our test directory
 		records[key][i] = value
+		print(f"updated_columns = {updated_columns}")
 		query.update(key, *updated_columns)
 		record = query.select(key, 0, [1, 1, 1, 1, 1])[0]
 		error = False
