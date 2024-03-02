@@ -1,6 +1,6 @@
 import struct
 from typing import Annotated
-from lstore.config import FullMetadata, WriteSpecifiedMetadata, config
+from lstore.config import FullMetadata, WriteSpecifiedBaseMetadata, config
 from lstore.helper import helper
 
 

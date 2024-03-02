@@ -1,13 +1,13 @@
 from typing import Literal
 from lstore.bufferpool import PsuedoBuffIntValue, Table
 from lstore.ColumnIndex import DataIndex, RawIndex
-from lstore.page_directory_entry import PageDirectoryEntry, BasePageID
+from lstore.page_directory_entry import BaseRID, PageDirectoryEntry, BasePageID
 #from lstore.pseudo_buff_dict_value import Record
 from lstore.record_physical_page import Record
 from lstore.index import Index
 #from lstore.base_tail_page import BasePage, Page, TailPage
 import time
-from lstore.config import WriteSpecifiedMetadata, config
+from lstore.config import WriteSpecifiedBaseMetadata, WriteSpecifiedTailMetadata, config
 from lstore.helper import helper
 import struct
 
@@ -128,7 +128,7 @@ class Query:
         # the null column in this Metadata object won't be used by the page insert.
         # #print(f"trying to insert")
         # #print(f"trying to insert {columns}")
-        rid = self.table.file_handler.insert_base_record(WriteSpecifiedMetadata(None, 0b0, None),
+        rid = self.table.file_handler.insert_base_record(WriteSpecifiedBaseMetadata(None, 0b0, None),
                                                                      *columns)
         print(f"trying to insert rid = {rid}")
         if rid == 511:
@@ -174,7 +174,7 @@ class Query:
         # otherwise, locate the rid manually
         # ...get the updated value for this rid
         valid_records: list[Record] = []
-        if False:  # search_key_index == self.table.key_index
+        if search_key_index == self.table.key_index:  # search_key_index == self.table.key_index
             rid = self.table.index.locate(search_key_index, search_key)
             if rid is not None:
                 record = self.db_bpool.get_updated_record(self.table, rid, [1] * self.table.num_columns)
@@ -210,22 +210,6 @@ class Query:
                     else:
                         # col_list[i] = self.get_updated_col(record, DataIndex(i))
                         col_list[i] = self.db_bpool.get_updated_col(self.table, record, DataIndex(i))
-                        # if helper.ith_bit(schema_encoding, self.table.num_columns, i,
-                        #                   False) == 0b1:  # check if the column has been updated.
-                        #     # #print("detected on schema encoding bit")
-                        #     assert record.indirection_column is not None, "inconsistent state: schema_encoding bit on but indirection was None"
-                        #     curr_rid = record.indirection_column
-                        #     curr_schema_encoding = self.table.get_record_by_rid(curr_rid).schema_encoding
-                        #     while helper.ith_bit(curr_schema_encoding, self.table.num_columns, i, False) == 0b0:
-                        #         # #print(f"schema encoding {curr_schema_encoding} indicates this record doesn't have the data. ")
-                        #         temp = self.table.get_record_by_rid(curr_rid)
-                        #         assert temp.indirection_column is not None
-                        #         curr_rid = temp.indirection_column
-                        #         curr_schema_encoding = self.table.get_record_by_rid(curr_rid).schema_encoding
-                        #         # curr_rid, curr_schema_encoding = temp.indirection_column, temp.schema_encoding
-                        #         # curr_indirection = temp
-                        #     col_list[i] = self.table.get_record_by_rid(curr_rid)[i]
-                    # rec.columns[i] = None  # filter out that column from the projection
             record.columns = tuple(col_list)
             ret.append(record)
 
@@ -341,18 +325,6 @@ class Query:
     # Returns True if update is succesful
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
-    """
-    def update(self,primary_key: int, *columns: int | None, **kwargs: bool) :
-        delete = kwargs.get("delete")
-        if delete is None:
-            delete = False
-        #check that the len(columns) is equal to the table 
-        #check primary key match 
-        primary_key_matches = self.select(primary_key, self.table.key_index, [1] * len(columns))
-    """
-
-
-
     
     # TODO finish
     """
@@ -361,6 +333,9 @@ class Query:
         delete = kwargs.get("delete")
         if delete is None:
             delete = False
+        elif delete == True:
+            raise(Exception("not implemented"))
+
         
         assert len(
             columns) == self.table.num_columns, f"len(columns) must be equal to number of columns in table; argument had length {len(columns)} but expected {self.table.num_columns} length, cols was {columns}"
@@ -421,7 +396,8 @@ class Query:
             null_bitmask >>= 1
 
             if column_first_update:
-                tail_1_metadata = WriteSpecifiedMetadata(tail_1_indirection, tail_1_schema_encoding, null_bitmask)
+                assert base_record.metadata.rid is not None
+                tail_1_metadata = WriteSpecifiedTailMetadata(tail_1_indirection, tail_1_schema_encoding, null_bitmask, base_record.metadata.rid)
                 tail_indirection = self.db_bpool.insert_tail_record(self.table, tail_1_metadata, *tail_1_values)
                 
             else:
@@ -443,63 +419,14 @@ class Query:
                 # tail_schema_encoding |= prev_schema_encoding  # if first_update, these two should be the same. but if not then it might change
 
 
-        else:
-            tail_schema_encoding = 0b0
-            tail_indirection = base_record.metadata.base_rid
-
-            # curr = tail_indirection
-            bitmask = self.table.ith_total_col_shift(config.RID_COLUMN)
-            # bitmask = 1 << (self.table.total_columns - config.RID_COLUMN - 1) # this will go into the NULL_COLUMN; ie we are setting the RID to null
-            # packed_data = struct.pack('>Q', bitmask)
-            # # Append the packed bytes to the bytearray
-            # page.physical_pages[config.NULL_COLUMN].data[offset*8:offset*8+8] = packed_data
-            # indirection_column = struct.unpack('>Q', page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]
-            tmp_indirection_col: int | None = base_record.metadata.indirection_column
-
-            if tmp_indirection_col is not None:
-                while True:
-                    if tmp_indirection_col is None:
-                        break
-
-                    base_dir_entry = self.table.page_directory_buff[tmp_indirection_col]
-                    page_id = base_dir_entry.page_id
-                    offset = base_dir_entry.offset
-
-                    # packed_data = struct.pack(config.PACKING_FORMAT_STR, bitmask)
-                    # Append the packed bytes to the bytearray
-
-                    self.db_bpool.delete_nth_record(self.table, page_id, offset)# the other bits in the null column no longer matter because they are deleted
-                    #page.update_nth_record(offset, config.RID_COLUMN, 0b0)  # set the RID to null                    
-                    
-                    if base_dir_entry.page_type == "base":
-                        break
-                    
-
-                    current_buffer_record=self.db_bpool.get_record(self.table,tmp_indirection_col,[1]*self.table.num_columns)
-                    assert current_buffer_record is not None
-                    current_record=current_buffer_record.get_value()
-                    tmp_indirection_col=current_record.metadata.indirection_column
-                    
-                    
-                    # page.physical_pages[config.NULL_COLUMN].data[offset*8:offset*8+8] = packed_data
-                    #tmp_indirection_col=helper.unpack_data(page.physical_pages[config.INDIRECTION_COLUMN].data, offset)
-
-                    #tmp_indirection_col = helper.unpack_col(page, config.INDIRECTION_COLUMN, offset)
-                    # tmp_indirection_col = struct.unpack(config.PACKING_FORMAT_STR, page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]
-            else: #deleting base record
-                assert base_record.metadata.rid is not None
-                base_dir_entry = self.table.page_directory_buff[base_record.metadata.rid]
-                self.db_bpool.delete_nth_record(self.table, BasePageID(base_record.metadata.base_rid), base_dir_entry.offset)# the other bits in the null column no longer matter because they are deleted
-                #base_dir_entry.page_id.update_nth_record(base_dir_entry.offset, config.NULL_COLUMN, bitmask)
-            
         #base_indirection = self.insert_tail(page_range, tail_indirection, tail_schema_encoding, *updated_columns)
-        base_metadata = WriteSpecifiedMetadata(tail_indirection, tail_schema_encoding, null_bitmask)
-        base_indirection = self.db_bpool.insert_tail_record(self.table, base_metadata, *updated_columns)
+        assert base_record.metadata.rid is not None
+        tail_metadata = WriteSpecifiedTailMetadata(tail_indirection, tail_schema_encoding, null_bitmask, base_record.metadata.rid)
+        base_indirection = self.db_bpool.insert_tail_record(self.table, tail_metadata, *updated_columns)
         
-        #success = base_page_dir_entry.page_id.update_nth_record(base_page_dir_entry.offset, config.INDIRECTION_COLUMN,
-        #                                                        base_indirection)
         
-        success = self.db_bpool.update_nth_record(base_dir_entry.page_id, base_dir_entry.offset, config.INDIRECTION_COLUMN, base_indirection)
+        # success = self.db_bpool.update_nth_record(base_dir_entry.page_id, base_dir_entry.offset, config.INDIRECTION_COLUMN, base_indirection)
+        success = self.db_bpool.update_col_record_inplace(self.table, BaseRID(base_record.metadata.rid), config.INDIRECTION_COLUMN, base_indirection)
         
         
         assert success, "update not successful"
@@ -508,7 +435,7 @@ class Query:
         #                                                        config.SCHEMA_ENCODING_COLUMN,
         #                                                        base_schema_encoding)
         
-        #success = self.db_bpool.update_nth_record(base_dir_entry.page_id, base_dir_entry.offset, config.SCHEMA_ENCODING_COLUMN, base_schema_encoding)
+        success = self.db_bpool.update_col_record_inplace(self.table, BaseRID(base_page_dir_entry.page_id), config.SCHEMA_ENCODING_COLUMN, base_schema_encoding)
         assert success, "update not successful"
         
         return success

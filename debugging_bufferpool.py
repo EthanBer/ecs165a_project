@@ -14,7 +14,7 @@ db.open("./TEST_DB_PATH")
 grades_table = db.create_table('Grades', 5, 0)
 
 query = Query(grades_table)
-number_of_records = 512
+number_of_records = 1000
 number_of_aggregates = 100
 records = {}
 seed(3562901)
@@ -37,32 +37,37 @@ for key in records:
 	error = False
 	for i, column in enumerate(record.columns):
 		if column != records[key][i]:
-			rror = True
+			error = True
 	if error:
+		raise(Exception("SELECT ERROR"))
 		print('select error on', key, ':', record.columns, ', correct:', records[key])
 	else:
 		pass
-		# print('select on', key, ':', record.columns)
+		print('select on', key, ':', record.columns)
+print("SELECT PASS")
+
+for key in records:
+	updated_columns = [None, None, None, None, None]
+	for i in range(2, grades_table.num_columns):
+		# updated value
+		value = randint(0, 20)
+		updated_columns[i] = value
+		# copy record to check
+		original = records[key].copy()
+		# update our test directory
+		records[key][i] = value
+		query.update(key, *updated_columns)
+		record = query.select(key, 0, [1, 1, 1, 1, 1])[0]
+		error = False
+		for j, column in enumerate(record.columns):
+			if column != records[key][j]:
+				error = True
+		if error:
+			raise(Exception("UPDATE ERROR")) 
+			print('update error on', original, 'and', updated_columns, ':', record, ', correct:', records[key])
+		else:
+			pass
+			# print('update on', original, 'and', updated_columns, ':', record)
+		updated_columns[i] = None
 
 db.close()
-# db.open("./TEST_DB_PATH")
-# db.close()
-# db.open("./TEST_DB_PATH")
-# records = {}
-#db.close()
-# for key in records:
-# 	pass
-#     # select function will return array of records
-#     # here we are sure that there is only one record in t hat array
-#     # check for retreiving version -1. Should retreive version 0 since only one version exists.
-# 	s = query.select(key, 0, [1, 1, 1, 1, 1])
-	# record = s[0]
-	# error = False
-	# for i, column in enumerate(record.columns):
-	# 	if column != records[key][i]:
-	# 		error = True
-	# if error:
-	# 	print('select error on', key, ':', record.columns, ', correct:', records[key])
-	# else:
-	# 	pass
-		# print('select on', key, ':', record)

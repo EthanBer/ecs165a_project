@@ -20,7 +20,7 @@ class Index:
 
     def locate(self, column: int, value: int) -> int | list | None:
         try:
-            search_result = self.indices[column][value]
+            search_result = self.indices[column][value] #@IgnoreException
             if len(search_result) == 1:
                 return search_result[0]
             else:

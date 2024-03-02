@@ -20,6 +20,7 @@ class config:
 
 	BUFFERPOOL_SIZE = 256
 	INITIAL_TPS = (2**64) - 1
+	INITIAL_TID = (2**64) - 1
 	# BASE_PAGE_FILE_SCHEMA = ["metadata_pointer", "offset", "TPS", "base_data"]
 	# TAIL_PAGE_FILE_SCHEMA = ["metadata_pointer", "offset", "tail_data"]
 	# METADATA_PAGE_FILE_SCHEMA = ["offset", "metadata"]
@@ -64,11 +65,19 @@ class FullMetadata:
 		self.base_rid=base_rid
 		
 
-class WriteSpecifiedMetadata:
+class WriteSpecifiedBaseMetadata:
 	def __init__(self, indirection_column: int | None, schema_encoding: int, null_column: int | None):
 		# self.rid = rid
 		# self.timestamp = timestamp
 		self.indirection_column = indirection_column
 		self.schema_encoding = schema_encoding
-		self.null_column = null_column
+		# self.null_column = null_column
 		
+class WriteSpecifiedTailMetadata:
+	def __init__(self, indirection_column: int | None, schema_encoding: int, null_column: int | None, base_rid: int):
+		# self.rid = rid
+		# self.timestamp = timestamp
+		self.base_rid = base_rid
+		self.indirection_column = indirection_column
+		self.schema_encoding = schema_encoding
+		# self.null_column = null_column

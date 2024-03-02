@@ -4,7 +4,11 @@ from __future__ import annotations
 class RawIndex(int):
 	def toDataIndex(self) -> DataIndex:
 		from lstore.config import config
-		return DataIndex(self - config.NUM_METADATA_COL)
+		if self >= config.NUM_METADATA_COL:
+			return DataIndex(self - config.NUM_METADATA_COL)
+		else:
+			raise(Exception("conversion from RawIndex to DataIndex resulted in a negative value. maybe a metadata column was converted into a DataIndex?"))
+		# 	pass
 
 class DataIndex(int):
 	def toRawIndex(self) -> RawIndex:

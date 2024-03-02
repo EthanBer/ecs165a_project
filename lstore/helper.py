@@ -19,6 +19,10 @@ class helper:
 		# # #print(f"data{data}", record_idx)
 		return int.from_bytes(data[record_offset:record_offset+8], byteorder="big")
 		# return struct.unpack(config.PACKING_FORMAT_STR, data[record_offset:record_offset+8])[0]
+
+	@staticmethod
+	def encode(value: int) -> bytes:
+		return int.to_bytes(value, config.BYTES_PER_INT, "big")
 	
 	# @staticmethod
 	# def unpack_col(page: 'Page', col_idx: RawIndex, record_idx: int) -> int: # col_idx is the index of the desired physical page in which the data is stored
