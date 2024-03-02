@@ -177,14 +177,14 @@ class Query:
         if search_key_index == self.table.key_index:  # search_key_index == self.table.key_index
             rid = self.table.index.locate(search_key_index, search_key)
             if rid is not None:
-                record = self.db_bpool.get_updated_record(self.table, rid, [1] * self.table.num_columns)
+                record = self.db_bpool.get_updated_record(self.table, rid, "base", [1] * self.table.num_columns)
                 assert record is not None, "record was none even though rid was not none"
                 valid_records.append(record)
                 # #print(f"record cols was {valid_records[0].columns}")
         else:
             last_base_rid_buff = self.table.file_handler.next_base_rid
             for rid in range(1, last_base_rid_buff.value()):
-                record = self.db_bpool.get_updated_record(self.table, rid, [1] * self.table.num_columns)
+                record = self.db_bpool.get_updated_record(self.table, rid, "base", [1] * self.table.num_columns)
                 assert record is not None
                 assert record.metadata.rid == rid
                 assert record.metadata.rid is not None
@@ -233,92 +233,91 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
     
-    def select_version(self, search_key: int, search_key_index: DataIndex, projected_columns_index: list[Literal[0, 1]],
-                       relative_version: int) -> list[Record] | Literal[False]:
-        # search_key_index = DataIndex(search_key_index)
-        # projected_columns_index = [DataIndex(idx) for idx in projected_columns_index]
-        #  #print(self.table.page_directory.keys())
-        ret: list[Record] = []
-        # if search_key is the key_index, then the rid is located by the index
-        # otherwise, locate the rid manually
-        # ...get the updated value for this rid
-        valid_records: list[Record] = []
+    # def select_version(self, search_key: int, search_key_index: DataIndex, projected_columns_index: list[Literal[0, 1]],
+    #                    relative_version: int) -> list[Record] | Literal[False]:
+    #     # search_key_index = DataIndex(search_key_index)
+    #     # projected_columns_index = [DataIndex(idx) for idx in projected_columns_index]
+    #     #  #print(self.table.page_directory.keys())
+    #     ret: list[Record] = []
+    #     # if search_key is the key_index, then the rid is located by the index
+    #     # otherwise, locate the rid manually
+    #     # ...get the updated value for this rid
+    #     valid_records: list[Record] = []
         
-        if search_key_index == self.table.key_index:
-            # #print(search_key_index)
-            # #print(search_key)
-            rid = self.table.index.locate(search_key_index, search_key)
-            if rid is not None:
-                # raise(Exception("select should not be called on a key that doesn't exist"))
-                valid_records.append(
-                    helper.not_null(self.db_bpool.get_version_record(self.table, rid, [1] * self.table.num_columns, relative_version)))
-        else:
-            last_base_rid = PsuedoBuffIntValue(self.table.file_handler, "catalog", config.byte_position.catalog.LAST_BASE_RID)
-            for rid in range(1, last_base_rid.value()):
-                rec = helper.not_null(self.db_bpool.get_version_record(self.table, rid, [1] * self.table.num_columns, relative_version))
-                assert rec.metadata.rid is not None
-                dir_entry = self.table.page_directory_buff[rec.metadata.rid]
-                if dir_entry.page_type != "base":
-                    continue
-                search_key_col = self.db_bpool.get_version_col(self.table, rec, search_key_index, relative_version)
-                if search_key_col == search_key:
-                    valid_records.append(rec)
-                #     valid_records.append(rid)
+    #     if search_key_index == self.table.key_index:
+    #         # #print(search_key_index)
+    #         # #print(search_key)
+    #         rid = self.table.index.locate(search_key_index, search_key)
+    #         if rid is not None:
+    #             # raise(Exception("select should not be called on a key that doesn't exist"))
+    #             valid_records.append(
+    #                 helper.not_null(self.db_bpool.get_version_record(self.table, rid, [1] * self.table.num_columns, relative_version)))
+    #     else:
+    #         last_base_rid = PsuedoBuffIntValue(self.table.file_handler, "catalog", config.byte_position.catalog.LAST_BASE_RID)
+    #         for rid in range(1, last_base_rid.value()):
+    #             rec = helper.not_null(self.db_bpool.get_version_record(self.table, rid, [1] * self.table.num_columns, relative_version))
+    #             assert rec.metadata.rid is not None
+    #             dir_entry = self.table.page_directory_buff[rec.metadata.rid]
+    #             if dir_entry.page_type != "base":
+    #                 continue
+    #             search_key_col = self.db_bpool.get_version_col(self.table, rec, search_key_index, relative_version)
+    #             if search_key_col == search_key:
+    #                 valid_records.append(rec)
+    #             #     valid_records.append(rid)
         
-        for record in valid_records:
-            col_list = list(record.columns)
-            schema_encoding = record.metadata.schema_encoding
-            for i in range(len(col_list)):
-                if projected_columns_index[i] == 0:
-                    col_list[i] = None
-                else:
-                    if record.metadata.rid == None:
-                        continue
-                    else:
-                        if helper.ith_bit(schema_encoding, self.table.num_columns, i,
-                                          False) == 0b1:  # check if the column has been updated.
-                            # #print("detected on schema encoding bit")
-                            assert record.metadata.indirection_column is not None, "inconsistent state: schema_encoding bit on but indirection was None"
-                            curr_rid = record.metadata.indirection_column
-                            record1 = helper.not_null(self.db_bpool.get_updated_record(self.table, curr_rid, [
-                                1] * self.table.num_columns))
-                            curr_schema_encoding = record1.metadata.schema_encoding
-                            counter = 0
-                            overversioned = False
-                            while counter > relative_version or helper.ith_bit(curr_schema_encoding,
-                                                                               self.table.num_columns, i, False) == 0b0:
-                                temp = self.db_bpool.get_updated_record(self.table, curr_rid,
-                                                                        [1] * self.table.num_columns)
-                                if temp is None:
-                                    overversioned = True
-                                    break
-                                assert temp.metadata.indirection_column is not None, "looped back to base record? indirection_column == None"
-                                curr_rid = temp.metadata.indirection_column
-                                tmp_record = helper.not_null(self.db_bpool.get_updated_record(self.table, curr_rid, [
-                                    1] * self.table.num_columns))
-                                curr_schema_encoding = tmp_record.metadata.schema_encoding
-                                counter -= 1
-                                # curr_rid, curr_schema_encoding = temp.indirection_column, temp.schema_encoding
-                                # curr_indirection = temp
-                            if overversioned is True:
-                                curr_rid = record.metadata.indirection_column
-                            tmp = helper.not_null(self.db_bpool.get_updated_record(self.table, curr_rid, [1] * self.table.num_columns))
-                            col_list[i] = tmp.columns[i]
-                    # rec.columns[i] = None  # filter out that column from the projection
-            if record.metadata.rid is None:
-                continue
-            curr_rid = helper.not_null(record.metadata.rid)
-            record.columns = helper.not_null(self.db_bpool.get_version_record(self.table, curr_rid,[1] * self.table.num_columns,relative_version)).columns
-            ret.append(record)
+    #     for record in valid_records:
+    #         col_list = list(record.columns)
+    #         schema_encoding = record.metadata.schema_encoding
+    #         for i in range(len(col_list)):
+    #             if projected_columns_index[i] == 0:
+    #                 col_list[i] = None
+    #             else:
+    #                 if record.metadata.rid == None:
+    #                     continue
+    #                 else:
+    #                     if helper.ith_bit(schema_encoding, self.table.num_columns, i,
+    #                                       False) == 0b1:  # check if the column has been updated.
+    #                         # #print("detected on schema encoding bit")
+    #                         assert record.metadata.indirection_column is not None, "inconsistent state: schema_encoding bit on but indirection was None"
+    #                         curr_rid = record.metadata.indirection_column
+    #                         record1 = helper.not_null(self.db_bpool.get_updated_record(self.table, curr_rid, "tail", [
+    #                             1] * self.table.num_columns))
+    #                         curr_schema_encoding = record1.metadata.schema_encoding
+    #                         counter = 0
+    #                         overversioned = False
+    #                         while counter > relative_version or helper.ith_bit(curr_schema_encoding,
+    #                                                                            self.table.num_columns, i, False) == 0b0:
+    #                             temp = self.db_bpool.get_updated_record(self.table, curr_rid, [1] * self.table.num_columns)
+    #                             if temp is None:
+    #                                 overversioned = True
+    #                                 break
+    #                             assert temp.metadata.indirection_column is not None, "looped back to base record? indirection_column == None"
+    #                             curr_rid = temp.metadata.indirection_column
+    #                             tmp_record = helper.not_null(self.db_bpool.get_updated_record(self.table, curr_rid, [
+    #                                 1] * self.table.num_columns))
+    #                             curr_schema_encoding = tmp_record.metadata.schema_encoding
+    #                             counter -= 1
+    #                             # curr_rid, curr_schema_encoding = temp.indirection_column, temp.schema_encoding
+    #                             # curr_indirection = temp
+    #                         if overversioned is True:
+    #                             curr_rid = record.metadata.indirection_column
+    #                         tmp = helper.not_null(self.db_bpool.get_updated_record(self.table, curr_rid, [1] * self.table.num_columns))
+    #                         col_list[i] = tmp.columns[i]
+    #                 # rec.columns[i] = None  # filter out that column from the projection
+    #         if record.metadata.rid is None:
+    #             continue
+    #         curr_rid = helper.not_null(record.metadata.rid)
+    #         record.columns = helper.not_null(self.db_bpool.get_version_record(self.table, curr_rid,[1] * self.table.num_columns,relative_version)).columns
+    #         ret.append(record)
 
-            # for i, column_value, data_index_indicator in enumerate(zip(rec.columns, projected_columns_index)):
-            #     if data_index_indicator == 1:
-            #         rec.columns[i] = column_value
-            # return [rec]
-            # else:
-            #     return None
-        # self.table.page_ranges.
-        return ret
+    #         # for i, column_value, data_index_indicator in enumerate(zip(rec.columns, projected_columns_index)):
+    #         #     if data_index_indicator == 1:
+    #         #         rec.columns[i] = column_value
+    #         # return [rec]
+    #         # else:
+    #         #     return None
+    #     # self.table.page_ranges.
+    #     return ret
 
     """
     # Update a record with specified key and columns
@@ -438,7 +437,7 @@ class Query:
         success = self.db_bpool.update_col_record_inplace(self.table, BaseRID(base_record.metadata.rid), config.SCHEMA_ENCODING_COLUMN, base_schema_encoding)
         assert success, "update not successful"
 
-        r = self.db_bpool.get_record(self.table, BaseRID(base_record.metadata.rid), [1] * self.table.num_columns)
+        r = self.db_bpool.get_record(self.table, BaseRID(base_record.metadata.rid), "base", [1] * self.table.num_columns)
         
         return success
 
@@ -515,33 +514,33 @@ class Query:
     # Returns False if no record exists in the given range
     """
 
-    def sum_version(self, start_range: int, end_range: int, aggregate_column_index: DataIndex,
-                    relative_version: int) -> int | bool:
-        s = None
+    # def sum_version(self, start_range: int, end_range: int, aggregate_column_index: DataIndex,
+    #                 relative_version: int) -> int | bool:
+    #     s = None
 
-        valid_numbers: list[int] = []
-        for key in range(start_range, end_range + 1):
-            projected_cols: list[Literal[0, 1]] = [0] * (self.table.num_columns - 0)
-            projected_cols[aggregate_column_index] = 1
-            use_idx = True
-            if aggregate_column_index == 1:
-                use_idx = False
-            select_query = self.select_version(key, self.table.key_index, projected_cols, relative_version)
-            if select_query == False or len(select_query) == 0: continue
-            assert len(select_query) == 1, "expected one for primary key but got " + str(len(select_query))
-            record = select_query[0]
-            assert record.metadata.rid is not None
-            dir_entry = self.table.page_directory_buff[record.metadata.rid]
-            if dir_entry.page_type != "base":
-                continue
-            num = record[aggregate_column_index]
-            assert num is not None
-            valid_numbers.append(num)
-            # valid_records.append(self.select(key, aggregate_column_index, projected_cols)[0])
-        if len(valid_numbers) == 0:
-            return False
-        else:
-            return sum(valid_numbers)
+    #     valid_numbers: list[int] = []
+    #     for key in range(start_range, end_range + 1):
+    #         projected_cols: list[Literal[0, 1]] = [0] * (self.table.num_columns - 0)
+    #         projected_cols[aggregate_column_index] = 1
+    #         use_idx = True
+    #         if aggregate_column_index == 1:
+    #             use_idx = False
+    #         select_query = self.select_version(key, self.table.key_index, projected_cols, relative_version)
+    #         if select_query == False or len(select_query) == 0: continue
+    #         assert len(select_query) == 1, "expected one for primary key but got " + str(len(select_query))
+    #         record = select_query[0]
+    #         assert record.metadata.rid is not None
+    #         dir_entry = self.table.page_directory_buff[record.metadata.rid]
+    #         if dir_entry.page_type != "base":
+    #             continue
+    #         num = record[aggregate_column_index]
+    #         assert num is not None
+    #         valid_numbers.append(num)
+    #         # valid_records.append(self.select(key, aggregate_column_index, projected_cols)[0])
+    #     if len(valid_numbers) == 0:
+    #         return False
+    #     else:
+    #         return sum(valid_numbers)
 
     """
     incremenets one column of the record

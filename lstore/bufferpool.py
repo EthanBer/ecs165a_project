@@ -953,7 +953,7 @@ class Bufferpool:
 	# returns whether the requested portion of record is in the bufferpool, 
 	# and the bufferpool indices of any column of the record found (regardless of whether it was)
 	# fully found or not
-	def is_record_in_bufferpool(self, table: Table, rid : int, projected_columns_index: list[Literal[0] | Literal[1]]) -> BufferpoolSearchResult: ## this will be called inside the bufferpool functions
+	def is_record_in_bufferpool(self, table: Table, rid : int, record_type: Literal["base", "tail"], projected_columns_index: list[Literal[0] | Literal[1]]) -> BufferpoolSearchResult: ## this will be called inside the bufferpool functions
 		# table: 'Table' = next(table for table in self.tables if table.name == table_name)
 		requested_columns: list[DataIndex] = [DataIndex(i) for i, binary_item in enumerate(projected_columns_index) if binary_item == 1]
 		
@@ -987,7 +987,7 @@ class Bufferpool:
 			if self.maybe_get_entry(i) is None:
 				continue
 			# print(f"scanned BP; physical_page_id = {self[i].physical_page_id} and record_page_id = {record_page_id}")
-			if self[i].physical_page_id == record_page_id:
+			if self[i].physical_page_id == record_page_id and self.get_page_type(i) == record_type:
 				raw_idx = self[i].physical_page_index
 				# print(f"raw = {raw_idx}")
 				assert raw_idx is not None, "non None in ids_of_physical_pages but None in index_of_physical_page_in_page?"
@@ -1097,7 +1097,7 @@ class Bufferpool:
 			assert curr_rid is not None, "record rid wasn't none, so none of the indirections should be none either"
 			proj_col: List[Literal[0, 1]] = [0] * table.num_columns
 			proj_col[col_idx] = 1 # only get the desired column
-			curr_record = self.get_record(table, curr_rid, proj_col)
+			curr_record = self.get_record(table, curr_rid, "tail", proj_col)
 			assert curr_record is not None, "a record with a non-None RID was not found"
 			curr_schema_encoding = curr_record.get_value().metadata.schema_encoding ## this schema encoding doesn't work properly
 			while helper.ith_bit(curr_schema_encoding, table.num_columns, col_idx, False) == 0b0: # while not found
@@ -1105,7 +1105,7 @@ class Bufferpool:
 				curr_rid = curr_record.get_value().metadata.indirection_column
 				assert curr_rid is not None
 				# curr_record.unpin()
-				curr_record = self.get_record(table, curr_rid, proj_col)
+				curr_record = self.get_record(table, curr_rid, "tail", proj_col)
 				assert curr_record is not None
 				curr_schema_encoding = curr_record.get_value().metadata.schema_encoding
 			desired_col = curr_record.get_value()[col_idx]
@@ -1124,7 +1124,7 @@ class Bufferpool:
 			assert curr_rid is not None, "record rid wasn't none, so none of the indirections should be none either"
 			proj_col: List[Literal[0, 1]] = [0] * table.num_columns
 			proj_col[col_idx] = 1 # only get the desired column
-			buff_record = self.get_record(table, curr_rid, proj_col)
+			buff_record = self.get_record(table, curr_rid, "base", proj_col)
 			assert buff_record is not None
 			record = buff_record.get_value()
 			curr_record = record
@@ -1136,14 +1136,14 @@ class Bufferpool:
 			curr_rid = curr_record.metadata.indirection_column
 			while counter > relative_version or helper.ith_bit(curr_schema_encoding, table.num_columns, col_idx, False) == 0b0: # while not found
 				assert curr_rid is not None
-				temp = self.get_record(table, curr_rid, proj_col)
+				temp = self.get_record(table, curr_rid, "tail", proj_col)
 				if temp is None:
 					overversioned = True
 					break
 				assert curr_record is not None
 				curr_rid = temp.get_value().metadata.indirection_column
 				assert curr_rid is not None, "potential incomplete delete?"
-				record_buff = self.get_record(table, curr_rid, proj_col)
+				record_buff = self.get_record(table, curr_rid, "tail", proj_col)
 				assert record_buff is not None
 				curr_record = record_buff.get_value()
 				curr_schema_encoding = curr_record.metadata.schema_encoding
@@ -1157,7 +1157,7 @@ class Bufferpool:
 		# table: Table = next(table for table in self.tables if table.name == table_name)
 
 		# If there are multiple writers we probably need a lock here so the indirection column is not modified after we get it
-		buffered_record = self.get_record(table, record_id, projected_columns_index)
+		buffered_record = self.get_record(table, record_id, "base", projected_columns_index)
 		if buffered_record is None:
 			return None
 		columns: List[int | None] = []
@@ -1170,12 +1170,12 @@ class Bufferpool:
 		return version_record
 
 	# THIS FUNCTION RECEIVES ONLY **BASE** RECORDS
-	def get_updated_record(self, table: Table, record_id: int, projected_columns_index: list[Literal[0] | Literal[1]]) -> Record | None:
+	def get_updated_record(self, table: Table, record_id: int, record_type: Literal["base", "tail"], projected_columns_index: list[Literal[0] | Literal[1]]) -> Record | None:
 		# table.file_handler.flush()
 		# table: Table = next(table for table in self.tables if table.name == table_name)
 
 		# If there are multiple writers we probably need a lock here so the indirection column is not modified after we get it
-		buffered_record = self.get_record(table, record_id, projected_columns_index)
+		buffered_record = self.get_record(table, record_id, record_type, projected_columns_index)
 		if buffered_record is None:
 			return None
 		columns: List[int | None] = []
@@ -1194,6 +1194,8 @@ class Bufferpool:
 			proj_data_cols = [1] * table.num_columns # type: ignore[assignment]
 		if proj_metadata_col is None:
 			proj_metadata_col = [1] * config.NUM_METADATA_COL # type: ignore[assignment]
+		print(f"isinstance TAil = {isinstance(page_id, TailPageID)}")
+		print(f"isinstance Base = {isinstance(page_id, BasePageID)}")
 
 		assert proj_data_cols is not None
 		assert proj_metadata_col is not None
@@ -1229,12 +1231,12 @@ class Bufferpool:
 	# TODO: remove type ignore
 	# TODO: get updated value with schema encoding (maybe not this function)
 	# TODO: specialize for tail records to only put the non-null columns in bufferpool
-	def get_record(self, table: Table, record_id: int, projected_columns_index: list[Literal[0] | Literal[1]]) -> BufferedRecord | None:
+	def get_record(self, table: Table, record_id: int, record_type: Literal["base", "tail"], projected_columns_index: list[Literal[0] | Literal[1]]) -> BufferedRecord | None:
 		# table.file_handler.write_new_base_page()
 		# table.file_handler.write_new_tail_page()
 		# table: 'Table' = next(table for table in self.tables if table.name == table_name)
 		requested_columns: list[DataIndex] = [DataIndex(i) for i, binary_item in enumerate(projected_columns_index) if binary_item == 1]
-		found, data_buff_indices, metadata_buff_indices, _ = self.is_record_in_bufferpool(table, record_id, projected_columns_index)
+		found, data_buff_indices, metadata_buff_indices, _ = self.is_record_in_bufferpool(table, record_id, record_type, projected_columns_index)
 		#  = t.found, t.data_buff_indices, t.metadata_buff_indices
 		assert len(data_buff_indices) == table.num_columns
 		assert len(metadata_buff_indices) == config.NUM_METADATA_COL
@@ -1311,7 +1313,7 @@ class Bufferpool:
 		assert a 
 
 
-		found, data_buff_indices, metadata_buff_indices, record_offset = self.is_record_in_bufferpool(table, record_id, projected_columns_index)
+		found, data_buff_indices, metadata_buff_indices, record_offset = self.is_record_in_bufferpool(table, record_id, record_type, projected_columns_index)
 		assert found, "record not found after bringing it into bufferpool"
 		assert record_offset is not None
 
