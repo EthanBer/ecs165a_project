@@ -130,7 +130,7 @@ class Query:
         # #print(f"trying to insert {columns}")
         rid = self.table.file_handler.insert_base_record(WriteSpecifiedBaseMetadata(None, 0b0, None),
                                                                      *columns)
-        print(f"trying to insert rid = {rid}")
+        # print(f"trying to insert rid = {rid}")
         if rid == 511:
             print(f"rid 511 was {columns}")
         if rid == 512:
