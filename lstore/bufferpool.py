@@ -19,18 +19,23 @@ from lstore.ColumnIndex import DataIndex, RawIndex
 from lstore.config import FullMetadata, WriteSpecifiedBaseMetadata, WriteSpecifiedTailMetadata, config
 from lstore.helper import helper
 from lstore.record_physical_page import PhysicalPage, Record
-from typing import Any, List, Literal, NamedTuple, Tuple, Type, TypeAlias, TypeGuard, TypeVar, Generic, Annotated, cast, get_args
+from typing import Any, List, Literal, NamedTuple, Sequence, Tuple, Type, TypeAlias, TypeGuard, TypeVar, Generic, Annotated, cast, get_args
 
 TPageType = Literal["base", "tail", "base_metadata", "tail_metadata"]
 class BufferpoolIndex(int):
 	pass
 
 TNOT_FOUND = Literal[-1]
-class BufferpoolSearchResult(NamedTuple):
+class BufferpoolRecordSearchResult(NamedTuple):
 	found: bool 
 	data_buff_indices: List[None | TNOT_FOUND | BufferpoolIndex]
 	metadata_buff_indices: List[TNOT_FOUND | BufferpoolIndex]
 	record_offset: int | None
+
+class BufferpoolPageSearchResult(NamedTuple):
+	found: bool 
+	data_buff_indices: List[None | TNOT_FOUND | BufferpoolIndex]
+	metadata_buff_indices: List[TNOT_FOUND | BufferpoolIndex]
 
 class FilePageReadResult(NamedTuple):
 	metadata_physical_pages: list[PhysicalPage | None]
@@ -385,38 +390,11 @@ class FileHandler:
 	
 
 	def insert_base_record(self, metadata: WriteSpecifiedBaseMetadata, *columns: int | None) -> int: # returns RID of inserted record
-		null_bitmask = 0
-		total_cols = self.table.total_columns
-		if metadata.indirection_column == None: # set 1 for null indirection column
-			# #print("setting indirection null bit")
-			null_bitmask = helper.ith_total_col_shift(total_cols, config.INDIRECTION_COLUMN)
-			# null_bitmask = 1 << (total_cols - 1)
-		for idx, column in enumerate(columns):
-			# #print(f"checking cols for null... {column}")
-			if column is None:
-				# #print("found a null col")
-				null_bitmask = null_bitmask | helper.ith_total_col_shift(len(columns), idx, False) #
-				# null_bitmask = null_bitmask | (1 << (len(columns)-idx-1))
-			
-		# #print(f"inserting null bitmask {bin(null_bitmask)}")
-		
-		# Transform columns to a list to append the schema encoding and the indirection column
-		# #print(columns)
-		list_columns: list[int | None] = list(columns)
-		data_columns = list_columns
-		metadata_columns: list[int | None] = []
-		rid = self.next_base_rid.value(1)
-		metadata_columns.insert(config.INDIRECTION_COLUMN, metadata.indirection_column)
-		metadata_columns.insert(config.RID_COLUMN, rid)
-		metadata_columns.insert(config.TIMESTAMP_COLUMN, int(time.time()))
-		metadata_columns.insert(config.SCHEMA_ENCODING_COLUMN, metadata.schema_encoding)
-		metadata_columns.insert(config.NULL_COLUMN, null_bitmask)
-		metadata_columns.insert(config.BASE_RID, rid)
-		# cols = tuple(data_columns + metadata_columns)
 		curr_offset = self.base_offset.value()
 		metadata_page_id = self.next_base_metadata_page_id.value()
 		base_page_id = self.next_base_page_id.value()
-		if curr_offset == config.PHYSICAL_PAGE_SIZE: 
+		proj_data_cols = list(map(lambda col: 1 if col is not None else 0, columns))
+		if curr_offset == config.PHYSICAL_PAGE_SIZE - config.BYTES_PER_INT:
 			self.next_base_page_id.value(1)
 			self.next_base_metadata_page_id.value(1)
 			metadata_page_id = self.next_base_metadata_page_id.value()
@@ -427,34 +405,14 @@ class FileHandler:
 			self.base_offset.flush() # flush the old base_offset before making a new one
 			self.base_offset = PsuedoBuffIntValue(self, base_page_id, config.byte_position.base_tail.OFFSET)
 			curr_offset = self.base_offset.value()
-			print(f"set curr_offset to {curr_offset}")
-			# self.base_offset.value(-config.PHYSICAL_PAGE_SIZE) # set to 0
-			assert self.base_offset.value() == 0
 
-		metadata_path = self.metadata_path(BaseMetadataPageID(metadata_page_id))
-		with open(metadata_path, "r+b") as mfile:
-			mfile.seek(8)
-			mfile.seek(curr_offset, 1)
-			for mcol in metadata_columns:
-				mfile.write(int.to_bytes(mcol if mcol is not None else 0, config.BYTES_PER_INT, "big"))
-				mfile.seek(config.PHYSICAL_PAGE_SIZE - config.BYTES_PER_INT, 1)
-		mfile.close()
+		# get the indices in the bufferpool where data_pages and metadata_pages are
+		# append a new record at the curr_offset
+		# increment curr_offset
+		found, metadata_buff_indices, data_buff_indices = self.table.db_bpool.is_page_in_bufferpool(self.table, base_page_id, proj_data_cols) # type: ignore[arg-type]
+		assert self.table.db_bpool.bring_from_disk(table, base_page_id, proj_data_cols, None) # type: ignore[arg-type]
 		
-
-		base_path = self.base_path(BasePageID(base_page_id))
-		# print(f"base path = {base_path}")
-		with open(base_path, "r+b") as bfile:
-			bfile.seek(24)
-			bfile.seek(curr_offset, 1)
-			for dcol in data_columns:
-				bfile.write(int.to_bytes(dcol if dcol is not None else 0, config.BYTES_PER_INT, "big"))
-				bfile.seek(config.PHYSICAL_PAGE_SIZE - config.BYTES_PER_INT, 1) 
-		bfile.close()
-		print(f"assigned rid {rid} to offset {self.base_offset.value()} and page {base_page_id} ")
-		pg_dir_entry = PageDirectoryEntry(BasePageID(base_page_id), BaseMetadataPageID(metadata_page_id), self.base_offset.value(), "base")
-		self.table.page_directory_buff.value_assign(rid, pg_dir_entry)
-		self.base_offset.value(config.BYTES_PER_INT)
-		return rid
+		return -1
 
 	def insert_tail_record(self, metadata: WriteSpecifiedTailMetadata, *columns: int | None) -> int: # returns RID of inserted record
 		null_bitmask = 0
@@ -952,28 +910,29 @@ class Bufferpool:
 		print(f"inserting tail record mjtadata {metadata} and columns {columns}")
 		return table.file_handler.insert_tail_record(metadata, *columns)
 
-	# returns whether the requested portion of record is in the bufferpool, 
-	# and the bufferpool indices of any column of the record found (regardless of whether it was)
-	# fully found or not
-		# table: 'Table' = next(table for table in self.tables if table.name == table_name)
-	def is_record_in_bufferpool(self, table: Table, rid : RID, projected_columns_index: list[Literal[0] | Literal[1]]) -> BufferpoolSearchResult: ## this will be called inside the bufferpool functions
-		requested_columns: list[DataIndex] = [DataIndex(i) for i, binary_item in enumerate(projected_columns_index) if binary_item == 1]
-		
-		# a = table.page_directory_buff.value_get()
-		# for key in a.keys():
-		# 	if key == record_id:
-		# 		page_directory_entry = table.page_directory_buff[key]
-		# 		break 
+	# look up an rid in the page directory to get its pageID
+	def rid_to_page_id(self, table: Table, rid: RID) -> PageID:
 		page_dir = table.page_directory_buff.value_get()
 		if not rid in page_dir:
 			raise(Exception("RECORD NOT PRESENT"))
-			return BufferpoolSearchResult(False, [], [], None)
+			return BufferpoolRecordSearchResult(False, [], [], None)
 		page_directory_entry = page_dir[rid]
+		return page_directory_entry.page_id
 
-		record_page_id=page_directory_entry.page_id
+	# look up an rid in the page directory to get its offset
+	def rid_to_offset(self, table: Table, rid: RID) -> int:
+		page_dir = table.page_directory_buff.value_get()
+		if not rid in page_dir:
+			raise(Exception("RECORD NOT PRESENT"))
+			return BufferpoolRecordSearchResult(False, [], [], None)
+		page_directory_entry = page_dir[rid]
+		return page_directory_entry.offset
 
-		number_of_columns = sum(projected_columns_index)
-		num_of_columns_found = 0
+	# checks if the requested columns (specified by projected_columns_index) of a page are inside the bufferpool.
+	# if they are, return the bufferpool frame indices in which the columns can be found. 
+	def is_page_in_bufferpool(self, table: Table, page_id: PageID, projected_columns_index: List[Literal[0] | Literal[1]]) -> BufferpoolPageSearchResult:
+		requested_columns: list[DataIndex] = [DataIndex(i) for i, binary_item in enumerate(projected_columns_index) if binary_item == 1]
+		
 		# the ith element of this array is:
 			# None, if not requested;
 			# -1, if requested but not found;
@@ -988,17 +947,12 @@ class Bufferpool:
 
 		
 		for i in [BufferpoolIndex(_) for _ in range(config.BUFFERPOOL_SIZE)]:
-		# for i in helper.cast_list(range(config.BUFFERPOOL_SIZE), BufferpoolIndex): # search the entire bufferpool for columns
 			if self.maybe_get_entry(i) is None:
 				continue
-			# print(f"scanned BP; physical_page_id = {self[i].physical_page_id} and record_page_id = {record_page_id}")
-			if helper.eq(self[i].physical_page_id, record_page_id, False):
-			# if self[i].physical_page_id == record_page_id and type(self[i].physical_page_id) == type(record_page_id):
+			if helper.eq(self[i].physical_page_id, page_id, False):
 				print(f"potential match... for entry idx {i} and type {type(self[i].physical_page_id)}")
 				raw_idx = self[i].physical_page_index
-				# print(f"raw = {raw_idx}")
 				assert raw_idx is not None, "non None in ids_of_physical_pages but None in index_of_physical_page_in_page?"
-				# print(f"raw_idx = {raw_idx} and data_idx would be {raw_idx - config.NUM_METADATA_COL}")
 				if raw_idx < config.NUM_METADATA_COL:
 					print(f"adding metadata idx {raw_idx} with value {i} for record type ")
 					metadata_buff_indices[raw_idx] = i
@@ -1013,7 +967,13 @@ class Bufferpool:
 						continue
 
 		found = (len([True for idx in data_buff_indices if idx == -1]) == 0) and (len([True for idx in metadata_buff_indices if idx == -1]) == 0)
-		return BufferpoolSearchResult(found, data_buff_indices, metadata_buff_indices, page_directory_entry.offset)
+		return BufferpoolPageSearchResult(found, data_buff_indices, metadata_buff_indices)
+
+	def is_record_in_bufferpool(self, table: Table, rid : RID, projected_columns_index: list[Literal[0] | Literal[1]]) -> BufferpoolRecordSearchResult: ## this will be called inside the bufferpool functions
+		page_id = self.rid_to_page_id(table, rid)
+		page_res = self.is_page_in_bufferpool(table, page_id, projected_columns_index)
+		return BufferpoolRecordSearchResult(page_res.found, page_res.data_buff_indices, page_res.metadata_buff_indices, self.rid_to_offset(table, rid))
+
 
 	def delete_nth_record(self, table : Table, page_id: PageID, offset :int) -> bool:
 		bitmask = table.ith_total_col_shift(config.RID_COLUMN)
@@ -1221,6 +1181,7 @@ class Bufferpool:
 		read_res = table.file_handler.read_projected_cols_of_page(page_id, proj_data_cols)
 		assert read_res is not None
 		metadata_physical_pages, data_physical_pages = read_res
+		print(f"read {proj_data_cols} from {page_id} and got {data_physical_pages}")
 		# assert t_ is not None
 		all_physical_pages = metadata_physical_pages + data_physical_pages
 
@@ -1234,6 +1195,89 @@ class Bufferpool:
 		return True
 
 
+	def get_page(self, table: Table, page_id: PageID, projected_columns_index: list[Literal[0] | Literal[1]]):
+		requested_columns: list[DataIndex] = [DataIndex(i) for i, binary_item in enumerate(projected_columns_index) if binary_item == 1]
+		found, data_buff_indices, metadata_buff_indices = self.is_page_in_bufferpool(table, page_id, projected_columns_index)
+		#  = t.found, t.data_buff_indices, t.metadata_buff_indices
+		assert len(data_buff_indices) == table.num_columns
+		assert len(metadata_buff_indices) == config.NUM_METADATA_COL
+
+		# None means not requested
+
+		data_cols_to_get: List[DataIndex] = []
+		metadata_cols_to_get: List[int] = [] # should be from 0 to config.NUM_METADATA_COL - 1
+
+		# the main difference here is that a certain column MAY be requested, 
+		# but all columns of metadata are requested.
+		# as a reminder, -1 for a buff_idx here means not found, None means not requested.
+
+		buff_idx_to_save: list[BufferpoolIndex] = [] # these are only temporarily "pinned" through the save array
+
+		for j, buff_idx in enumerate(data_buff_indices):
+			if buff_idx == -1 and j in requested_columns:
+				data_cols_to_get.append(DataIndex(j))
+			# elif buff_idx == None:
+			# 	data_physical_pages.append(None)
+			elif isinstance(buff_idx, BufferpoolIndex):
+				buff_idx_to_save.append(buff_idx)
+			# 	data_physical_pages.append(self[buff_idx].physical_page)
+			# 	self[buff_idx].pin_count += 1 
+		# 	else:
+		# 		raise(Exception("unexpected datatype for buff_idx inside the is_record_in_bufferpool output"))
+
+		for j, buff_idx in enumerate(metadata_buff_indices):
+			if buff_idx == -1:
+				metadata_cols_to_get.append(DataIndex(j))
+			else:
+				buff_idx_to_save.append(buff_idx) # type: ignore[arg-type]
+		# 		physical_page = self[buff_idx].physical_page
+		# 		assert physical_page is not None
+		# 		metadata_physical_pages.append(physical_page)
+		# 		self[buff_idx].pin_count += 1 
+
+
+		# a key line:
+		# evict just enough to get the remaining columns, but don't evict what we already have.
+		# "what we already have" has been pinned
+		# evicted_buff_idx: List[BufferpoolIndex] | None = self.evict_n_slots(len(metadata_cols_to_get + data_cols_to_get), buff_idx_to_pin)
+		# if evicted_buff_idx is None:
+		# 	return None
+
+		page_dir = table.page_directory_buff.value_get()
+		if not record_id in page_dir:
+			return None
+		page_directory_entry = table.page_directory_buff[record_id]
+
+		# NOTE: this is the new proj_cols, to get only whatever we don't have already
+		proj_metadata_cols: List[Literal[0, 1]] = [0] * config.NUM_METADATA_COL 
+		for i in range(len(metadata_cols_to_get)):
+			proj_metadata_cols[metadata_cols_to_get[i]] = 1
+
+		proj_data_cols: List[Literal[0, 1]] = [0] * table.num_columns
+		for i in range(len(data_cols_to_get)):
+			proj_data_cols[data_cols_to_get[i]] = 1
+
+
+		print(f"type =  {'TAIL' if isinstance(page_id, TailPageID) else 'BASE' if isinstance(page_id, BasePageID) else '??'}")
+		# print(f"record_type = {record_type}")
+		a = self.bring_from_disk(table, page_id, proj_data_cols, proj_metadata_cols, buff_idx_to_save)
+		assert a 
+
+
+		found, data_buff_indices, metadata_buff_indices, record_offset = self.is_record_in_bufferpool(table, record_id, projected_columns_index)
+		assert found, "record not found after bringing it into bufferpool"
+		assert record_offset is not None
+
+		# filtering out the -1s should be the same as taking out the Nones
+		# ie taking out all not requesteds should leave us with all columns
+		filtered_data_buff_indices =  [idx for idx in data_buff_indices if (idx != -1) and (isinstance(idx, BufferpoolIndex)) ]
+		filtered_metadata_buff_indices =  [idx for idx in metadata_buff_indices if (idx != -1) and (isinstance(idx, BufferpoolIndex)) ]
+		relevant_data_buff_indices = [idx for idx in data_buff_indices if idx is not None]
+		relevant_metadata_buff_indices = [idx for idx in metadata_buff_indices if idx is not None]
+		assert len(filtered_data_buff_indices) == len(relevant_data_buff_indices)
+		assert len(filtered_metadata_buff_indices) == len(relevant_metadata_buff_indices)
+
+		r = BufferedRecord(self, table, filtered_metadata_buff_indices + filtered_data_buff_indices, record_offset, record_id, projected_columns_index)
 
 
 
@@ -1305,17 +1349,6 @@ class Bufferpool:
 		for i in range(len(data_cols_to_get)):
 			proj_data_cols[data_cols_to_get[i]] = 1
 
-		# read_res = table.file_handler.read_projected_cols_of_page(page_directory_entry.page_id, proj_data_cols, proj_metadata_cols)
-		# assert read_res is not None
-		# metadata_physical_pages, data_physical_pages, page_type = read_res
-		# # assert t_ is not None
-		# metadata_physical_pages, data_physical_pages = metadata_physical_pages, data_physical_pages
-		# all_physical_pages = metadata_physical_pages + data_physical_pages
-
-		# for i, buff_idx in enumerate(evicted_buff_idx):
-		# 	physical_page_ = all_physical_pages[i]
-		# 	if physical_page_ is not None:
-		# 		self[buff_idx] = BufferpoolEntry(0, physical_page_, False, page_directory_entry.page_id, RawIndex(i), page_type, table)
 
 		print(f"type =  {'TAIL' if isinstance(page_directory_entry.page_id, TailPageID) else 'BASE' if isinstance(page_directory_entry.page_id, BasePageID) else '??'}")
 		# print(f"record_type = {record_type}")

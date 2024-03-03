@@ -58,7 +58,7 @@ for key in records:
 		records[key][i] = value
 		print(f"updated_columns = {updated_columns}")
 		query.update(key, *updated_columns)
-		# record = query.select(key, 0, [1, 1, 1, 1, 1])[0]
+		record = query.select(key, 0, [1, 1, 1, 1, 1])[0]
 		error = False
 		for j, column in enumerate(record.columns):
 			if column != records[key][j]:
