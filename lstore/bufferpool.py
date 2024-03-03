@@ -969,19 +969,23 @@ class Bufferpool:
 	
 	# updates a column of a specified record in place.
 	# returns True on success
-	def update_col_record_inplace(self, table: Table, rid: BaseRID, raw_col_idx: RawIndex, new_value: int) -> bool:
+	def update_col_record_inplace(self, table: Table, rid: RID, raw_col_idx: RawIndex, new_value: int) -> bool:
 		is_metadata = raw_col_idx < config.NUM_METADATA_COL
 		proj_data_idx: List[Literal[0, 1]] = [0] * table.num_columns
 		proj_metadata_idx: List[Literal[0, 1]] = [0] * config.NUM_METADATA_COL
+		assert rid is not None
 		page_dir_entry = table.page_directory_buff[rid]
-		buff_idx: BufferpoolIndex | Literal[-1] = -1 
-		desired_page_type = "base"
+		buff_idx: BufferpoolIndex | Literal[-1] = -1
+
+		desired_page_type = "base" if isinstance(rid, BaseRID) else "tail"
+
 		if is_metadata: # this is a metadata column
 			proj_metadata_idx[raw_col_idx] = 1
 			desired_page_type += "_metadata" # base_metadata type
 		else:
 			proj_data_idx[raw_col_idx] = 1
 			# desired_page_type remains as "base"
+		
 		# col_idx = raw_col_idx.toDataIndex()
 
 		# ## check if that column is in the bufferpool already
@@ -1014,6 +1018,8 @@ class Bufferpool:
 		page_id = self.rid_to_page_id(table, rid)
 		indexes = self.get_page(table, page_id, proj_data_idx)
 		page_offset = self.rid_to_offset(table, rid)
+		
+		assert indexes is not None	# should this be an assert???
 
 		# now, we can actually update the value now that we know it's in the bufferpool
 		self[indexes[raw_col_idx]].physical_page.data[page_offset : page_offset+config.BYTES_PER_INT] = helper.encode(new_value) 
