@@ -1,4 +1,5 @@
 from lstore.ColumnIndex import RawIndex
+from lstore.page_directory_entry import RID
 
 
 class config:
@@ -56,7 +57,7 @@ class config:
 	BYTES_PER_INT = 8	
 
 class FullMetadata:
-	def __init__(self, rid: int | None, timestamp: int, indirection_column: int | None, schema_encoding: int, null_column: int | None,base_rid:int):
+	def __init__(self, rid: RID | None, timestamp: int, indirection_column: RID | None, schema_encoding: int, null_column: int | None, base_rid:RID):
 		self.rid = rid
 		self.timestamp = timestamp
 		self.indirection_column = indirection_column
@@ -66,12 +67,12 @@ class FullMetadata:
 		
 
 class WriteSpecifiedBaseMetadata:
-	def __init__(self, indirection_column: int | None, schema_encoding: int, null_column: int | None):
+	def __init__(self, indirection_column: RID | None, schema_encoding: int, null_column: int | None):
 		# self.rid = rid
 		# self.timestamp = timestamp
 		self.indirection_column = indirection_column
 		self.schema_encoding = schema_encoding
-		# self.null_column = null_column
+		self.null_column = null_column
 		
 class WriteSpecifiedTailMetadata:
 	def __init__(self, indirection_column: int | None, schema_encoding: int, null_column: int | None, base_rid: int):

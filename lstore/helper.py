@@ -44,12 +44,12 @@ class helper:
 		# 	s += el.__str__()
 		# return s
 
-	# helper function to type cast list 
-	# https://www.geeksforgeeks.org/python-type-casting-whole-list-and-matrix/
-	T = typing.TypeVar("T")
+	V = typing.TypeVar("V")
 	@staticmethod
-	def cast_list(test_list: list, data_type: T) -> list[T]:
-		return list(map(data_type, test_list)) # type: ignore[call-overload]
+	def eq(l: V, r: V, assert_same_types: bool=True) -> bool: # checks that types of two arguments are same
+		if assert_same_types:
+			assert type(l) == type(r), "variables compared with eq() must be of same underlying type/class"
+		return (l == r and type(l) == type(r))
 
 	U = typing.TypeVar("U")
 	@staticmethod

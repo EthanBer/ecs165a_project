@@ -174,17 +174,19 @@ class Query:
         # otherwise, locate the rid manually
         # ...get the updated value for this rid
         valid_records: list[Record] = []
+        rid: BaseRID
         if search_key_index == self.table.key_index:  # search_key_index == self.table.key_index
-            rid = self.table.index.locate(search_key_index, search_key)
+            rid = BaseRID(self.table.index.locate(search_key_index, search_key)) #type: ignore
             if rid is not None:
-                record = self.db_bpool.get_updated_record(self.table, rid, "base", [1] * self.table.num_columns)
+                record = self.db_bpool.get_updated_record(self.table, rid, [1] * self.table.num_columns)
                 assert record is not None, "record was none even though rid was not none"
                 valid_records.append(record)
                 # #print(f"record cols was {valid_records[0].columns}")
         else:
             last_base_rid_buff = self.table.file_handler.next_base_rid
-            for rid in range(1, last_base_rid_buff.value()):
-                record = self.db_bpool.get_updated_record(self.table, rid, "base", [1] * self.table.num_columns)
+            for rid in [BaseRID(_) for _ in range(1, last_base_rid_buff.value())]:
+            # for rid in helper.cast_list(range(1, last_base_rid_buff.value()), BaseRID()):
+                record = self.db_bpool.get_updated_record(self.table, rid, [1] * self.table.num_columns)
                 assert record is not None
                 assert record.metadata.rid == rid
                 assert record.metadata.rid is not None
@@ -437,7 +439,7 @@ class Query:
         success = self.db_bpool.update_col_record_inplace(self.table, BaseRID(base_record.metadata.rid), config.SCHEMA_ENCODING_COLUMN, base_schema_encoding)
         assert success, "update not successful"
 
-        r = self.db_bpool.get_record(self.table, BaseRID(base_record.metadata.rid), "base", [1] * self.table.num_columns)
+        r = self.db_bpool.get_record(self.table, BaseRID(base_record.metadata.rid), [1] * self.table.num_columns)
         
         return success
 
