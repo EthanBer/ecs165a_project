@@ -19,11 +19,9 @@ class Query:
     Queries that succeed should return the result or True
     Any query that crashes (due to exceptions) should return False
     """
-
     def __init__(self, table: Table):
         self.table = table
         self.db_bpool = table.db_bpool  # The bufferpool is the same for every table, because there is only one
-        pass
 
     """
     # internal Method
@@ -31,50 +29,57 @@ class Query:
     # Returns True upon succesful deletion
     # Return False if record doesn't exist or is locked due to 2PL
     """
-    """
+
     def delete(self, primary_key: int) -> bool:
+
+        projected_columns_index : list[Literal[0, 1]] = [1] * self.table.num_columns
+        records = self.select(primary_key, self.table.key_index, projected_columns_index)
+        assert len(records) == 1, "only one record should be returned with primary key"
+        record = records[0]
         
-        projected_columns_index = [1] * self.table.num_columns
+        bitmask = 0b1 << (self.table.num_columns - config.RID_COLUMN)
+
+        rid = record.metadata.rid
+        indirection_column = record.metadata.indirection_column
+
+        # If record was already deleted
+        if rid is None:
+            return False
+        
+        # The record doesn't have tail records
+        if indirection_column is None:
+            assert isinstance(rid, BaseRID)
+            new_null_column = record.metadata.null_column | bitmask
+            self.db_bpool.update_col_record_inplace(self.table, rid, config.NULL_COLUMN, new_null_column)
+            return True
+        
+        # Call update to create new tail record with everything None
+        self.update(primary_key, [None]*self.table.num_columns) # type: ignore
+
+
+        # after update we need to select again because the indirection column of the record has been updated
         records = self.select(primary_key, self.table.key_index, projected_columns_index)
         assert len(records) == 1, "only one record should be returned with primary key"
         record = records[0]
 
-        if (len(records) == 0):
-            return False
-
-        tmp = self.table.page_directory[record.rid]
-        page = tmp.page
-        offset = tmp.offset
-
-        bitmask = 1 << (self.table.num_columns - config.RID_COLUMN)
-        packed_data = struct.pack('>Q', bitmask)
-        # Append the packed bytes to the bytearray
-        page.physical_pages[config.NULL_COLUMN].data[offset*8:offset*8+8] = packed_data
-        indirection_column = struct.unpack('>Q', page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]
-
-        while indirection_column != 0:
-            tmp = self.table.page_directory[indirection_column]
-            page = tmp.page
-            offset = tmp.offset
-
-            packed_data = struct.pack('>Q', bitmask)
-            # Append the packed bytes to the bytearray
-            page.physical_pages[config.NULL_COLUMN].data[offset*8:offset*8+8] = packed_data
-            indirection_column = struct.unpack('>Q', page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]
+        indirection_column = record.metadata.indirection_column
+        assert indirection_column is not None
+        tmp = self.table.page_directory_buff[indirection_column] # This is the last tail page entry
         
-        # TODO: implement and uncomment
-        return False
-        # return self.update(primary_key, *([None] * self.table.num_columns), delete=True)
-        # bitmask = 1 << (self.table.num_columns - config.RID_COLUMN - 1)
-        # page_dir_entry = self.table.page_directory[record.rid]
-        # page = page_dir_entry.page
-        # offset = page_dir_entry.offset
-        # page.physical_pages[config.NULL_COLUMN].data[offset*8:offset*8+8] = packed_data
-        # indirection_column = struct.unpack('>Q', page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]
-        # packed_data = struct.pack('>Q', bitmask)
+        while tmp.page_type != "base":
+            new_null_column = bitmask | record.metadata.null_column
+            self.table.db_bpool.update_col_record_inplace(self.table, indirection_column, config.NULL_COLUMN, new_null_column)
 
-        # return
-    """
+            buf_record = self.db_bpool.get_record(self.table, indirection_column, [1]*self.table.num_columns)
+            assert buf_record is not None
+            record = buf_record.get_value()
+            assert record is not None
+            indirection_column = record.metadata.indirection_column
+            assert indirection_column is not None
+            tmp = self.table.page_directory_buff[indirection_column]
+
+        return True
+
 
     """
     def insert_tail(self, indirection_column: int, schema_encoding: int,
@@ -115,12 +120,12 @@ class Query:
         # pass
     """
 
+
     """
     # Insert a record with specified columns
     # Return True upon succesful insertion
     # Returns False if insert fails for whatever reason
     """
-
     def insert(self, *columns: int | None) -> bool:
         schema_encoding = 0b0
         timestamp = int(time.time())
@@ -150,6 +155,7 @@ class Query:
 
         return True
 
+
     # gets the most up-to-date column value for a record.
     def get_updated_col(self, record: Record, col_idx: DataIndex) -> int | None:
         return self.db_bpool.get_updated_col(self.table, record, DataIndex(col_idx))
@@ -163,7 +169,6 @@ class Query:
     # Returns False if record locked by TPL
     # Assume that select will never be called on a key that doesn't exist
     """
-    
     def select(self, search_key: int, search_key_index: DataIndex,
                projected_columns_index: list[Literal[0] | Literal[1]], use_idx: bool = False) -> list[Record]:
         # search_key_index = DataIndex(search_key_index)
@@ -224,6 +229,7 @@ class Query:
         # self.table.page_ranges.
         return ret
 
+
     """
     # Read matching record with specified search key
     # :param search_key: the value you want to search based on
@@ -234,7 +240,6 @@ class Query:
     # Returns False if record locked by TPL
     # Assume that select will never be called on a key that doesn't exist
     """
-    
     # def select_version(self, search_key: int, search_key_index: DataIndex, projected_columns_index: list[Literal[0, 1]],
     #                    relative_version: int) -> list[Record] | Literal[False]:
     #     # search_key_index = DataIndex(search_key_index)
@@ -321,12 +326,13 @@ class Query:
     #     # self.table.page_ranges.
     #     return ret
 
+
+
     """
     # Update a record with specified key and columns
     # Returns True if update is succesful
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
-    """
-    
+    """    
     # TODO finish
     """
     """
@@ -334,22 +340,19 @@ class Query:
         delete = kwargs.get("delete")
         if delete is None:
             delete = False
-        elif delete == True:
-            raise(Exception("not implemented"))
-
         
         assert len(
             columns) == self.table.num_columns, f"len(columns) must be equal to number of columns in table; argument had length {len(columns)} but expected {self.table.num_columns} length, cols was {columns}"
         if len(columns) != self.table.num_columns:
             return False
         primary_key_matches = self.select(primary_key, self.table.key_index, [1] * len(columns))
-        # #print(primary_key_matches)
+       
         assert len(
             primary_key_matches) == 1, f"only one primary key match for select, len was {len(primary_key_matches)}"
 
         if len(primary_key_matches) != 1:
             return False
-        # assert len(primary_key_matches) == 1 # primary key results in ONE select result
+        
         # select indirection and rid columns
         base_record = primary_key_matches[0]
         base_page_dir_entry = self.table.page_directory_buff[helper.not_null(base_record.metadata.rid)]
@@ -419,6 +422,65 @@ class Query:
                 #     last_update_page_dir_entry["offset"]).schema_encoding
                 # tail_schema_encoding |= prev_schema_encoding  # if first_update, these two should be the same. but if not then it might change
 
+        else:
+            tail_schema_encoding = 0b0
+            tail_indirection = base_record.metadata.base_rid
+
+            # curr = tail_indirection
+            bitmask = self.table.ith_total_col_shift(config.RID_COLUMN)
+            # bitmask = 1 << (self.table.total_columns - config.RID_COLUMN - 1) # this will go into the NULL_COLUMN; ie we are setting the RID to null
+            # packed_data = struct.pack('>Q', bitmask)
+            # # Append the packed bytes to the bytearray
+            # page.physical_pages[config.NULL_COLUMN].data[offset*8:offset*8+8] = packed_data
+            # indirection_column = struct.unpack('>Q', page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]
+            tmp_indirection_col: int | None = base_record.metadata.indirection_column
+
+            if tmp_indirection_col is not None:
+                while True:
+                    if tmp_indirection_col is None:
+                        break
+
+                    base_dir_entry = self.table.page_directory_buff[tmp_indirection_col]
+                    page_id = base_dir_entry.page_id
+                    offset = base_dir_entry.offset
+
+                    # packed_data = struct.pack(config.PACKING_FORMAT_STR, bitmask)
+                    # Append the packed bytes to the bytearray
+
+                    self.db_bpool.delete_nth_record(self.table, page_id, offset)# the other bits in the null column no longer matter because they are deleted
+                    #page.update_nth_record(offset, config.RID_COLUMN, 0b0)  # set the RID to null 
+
+                    if base_dir_entry.page_type == "base":
+                        break
+                            
+
+                    current_buffer_record=self.db_bpool.get_record(self.table,tmp_indirection_col,[1]*self.table.num_columns)
+                    assert current_buffer_record is not None
+                    current_record=current_buffer_record.get_value()
+                    tmp_indirection_col=current_record.metadata.indirection_column
+            
+            
+                    # page.physical_pages[config.NULL_COLUMN].data[offset*8:offset*8+8] = packed_data
+                    #tmp_indirection_col=helper.unpack_data(page.physical_pages[config.INDIRECTION_COLUMN].data, offset)
+
+                    #tmp_indirection_col = helper.unpack_col(page, config.INDIRECTION_COLUMN, offset)
+                    # tmp_indirection_col = struct.unpack(config.PACKING_FORMAT_STR, page.physical_pages[config.INDIRECTION_COLUMN].data[offset*8:offset*8+8])[0]
+                    
+            else: #deleting base record
+                assert base_record.metadata.rid is not None
+                base_dir_entry = self.table.page_directory_buff[base_record.metadata.rid]
+                self.db_bpool.delete_nth_record(self.table, BasePageID(base_record.metadata.base_rid), base_dir_entry.offset)# the other bits in the null column no longer matter because they are deleted
+                #base_dir_entry.page_id.update_nth_record(base_dir_entry.offset, config.NULL_COLUMN, bitmask)
+        
+        #base_indirection = self.insert_tail(page_range, tail_indirection, tail_schema_encoding, *updated_columns)
+        base_metadata = WriteSpecifiedMetadata(tail_indirection, tail_schema_encoding, null_bitmask)
+        base_indirection = self.db_bpool.insert_tail_record(self.table, base_metadata, *updated_columns)
+        
+        #success = base_page_dir_entry.page_id.update_nth_record(base_page_dir_entry.offset, config.INDIRECTION_COLUMN,
+        #                                                        base_indirection)
+        
+        success = self.db_bpool.update_nth_record(base_dir_entry.page_id, base_dir_entry.offset, config.INDIRECTION_COLUMN, base_indirection)
+        assert success, "update not successful"
 
         #base_indirection = self.insert_tail(page_range, tail_indirection, tail_schema_encoding, *updated_columns)
         assert base_record.metadata.rid is not None
@@ -506,6 +568,7 @@ class Query:
         #     s += self.table.get_record_by_rid(record.indirection_column)[aggregate_column_index]
         return s
 
+
     """
     :param start_range: int         # Start of the key range to aggregate 
     :param end_range: int           # End of the key range to aggregate 
@@ -544,6 +607,7 @@ class Query:
     #     else:
     #         return sum(valid_numbers)
 
+
     """
     incremenets one column of the record
     this implementation should work if your select and update queries already work
@@ -552,7 +616,6 @@ class Query:
     # Returns True is increment is successful
     # Returns False if no record matches key or if target record is locked by 2PL.
     """
-
     def increment(self, key: int, column: DataIndex) -> bool:
         r = self.select(key, self.table.key_index, [1] * self.table.num_columns)[0]
         if r is not False:

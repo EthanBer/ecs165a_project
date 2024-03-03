@@ -11,12 +11,9 @@ from types import FunctionType
 import typing
 import glob
 import os
-
-# from lstore import file_handler
 from lstore.index import Index
 from lstore.page_directory_entry import RID, BaseMetadataPageID, BasePageID, BaseRID, BaseTailPageID, MetadataPageID, PageDirectoryEntry, PageID, TailMetadataPageID, TailPageID, TailRID
 from lstore.ColumnIndex import DataIndex, RawIndex
-# from lstore.base_tail_page import BasePage
 from lstore.config import FullMetadata, WriteSpecifiedBaseMetadata, WriteSpecifiedTailMetadata, config
 from lstore.helper import helper
 from lstore.record_physical_page import PhysicalPage, Record
@@ -41,9 +38,6 @@ class BufferpoolPageSearchResult(NamedTuple):
 class FilePageReadResult(NamedTuple):
 	metadata_physical_pages: list[PhysicalPage | None]
 	data_physical_pages: list[PhysicalPage | None]
-
-
-	# page_type: str # should be only "base" or "tail" page type. unfortunately Literal["base", "tail"] causes typing issues 
 
 # this result is returned when getting a full record.
 class FullFilePageReadResult:
@@ -75,28 +69,25 @@ class PsuedoBuffIntValue:
 		self.file_handler = file_handler
 		self.byte_positions = [byte_position]
 		self._value = file_handler.read_int_value(page_sub_path, byte_position)
-		#print(f"INITIING TO {self._value} and {self.page_paths}")
-		# self._value = file_handler.read_value(page_sub_path, byte_position, "int")
+	
 	def flush(self) -> None:
 		if self.dirty:
 			for i in range(len(self.page_paths)):
 				self.file_handler.write_position(self.page_paths[i], self.byte_positions[i], self._value)
 		self.flushed = True
-		#print(f"FLUSHED {self._value} in {self.page_paths}")
+	
 	def value(self, increment: int=0) -> int:
 		val = self._value
-		# if self.flushed:
-		# 	raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
+		if self.flushed:
+			raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
 		if increment != 0:
 			self._value += increment 
-			#print("incremented thing")
 			self.dirty = True
-		#print(f"value {val} accessed with increment {increment}, with page_paths = {self.page_paths} and offset = {self.byte_positions}")
 		return val
+	
 	def value_assign(self, new_value: int) -> None:
 		self._value = new_value
 		self.dirty = True
-
 
 	# will flush the value to memory to THIS location also. 
 	def add_flush_location(self, page_sub_path: PageID | Literal["catalog"], byte_position: int) -> None:
@@ -105,32 +96,29 @@ class PsuedoBuffIntValue:
 
 	def __del__(self) -> None: # ensure that the value was flushed, if it was dirty
 		if not self.flushed and self.dirty:
-			# #print(self.page_path, self._value, self.byte_position)
-			#print(f"ERROR IN  {self._value} in {self.page_paths}")
 			raise(Exception("unflushed int buffer value"))
-		# self.flush()
 
 class PBBasePageID(PsuedoBuffIntValue):
 	def __init__(self, file_handler: FileHandler, page_sub_path: PageID | Literal["catalog"], byte_position: int) -> None:
 		super().__init__(file_handler, page_sub_path, byte_position)
+	
 	def value(self, increment: int = 0) -> BasePageID:
 		val = self._value
-		# if self.flushed:
-		# 	raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
+		if self.flushed:
+			raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
 		if increment != 0:
 			self._value += increment 
 			self.dirty = True
 		return BasePageID(val)
-	# will flush the value to memory to THIS location also. 
 
 class PBTailPageID(PsuedoBuffIntValue):
 	def __init__(self, file_handler: FileHandler, page_sub_path: PageID | Literal["catalog"], byte_position: int) -> None:
 		super().__init__(file_handler, page_sub_path, byte_position)
+
 	def value(self, increment: int = 0) -> TailPageID:
-		# super().value()e
 		val = self._value
-		# if self.flushed:
-		# 	raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
+		if self.flushed:
+			raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
 		if increment != 0:
 			self._value += increment 
 			self.dirty = True
@@ -139,11 +127,11 @@ class PBTailPageID(PsuedoBuffIntValue):
 class PBBaseMetadataPageID(PsuedoBuffIntValue):
 	def __init__(self, file_handler: FileHandler, page_sub_path: PageID | Literal["catalog"], byte_position: int) -> None:
 		super().__init__(file_handler, page_sub_path, byte_position)
+	
 	def value(self, increment: int = 0) -> BaseMetadataPageID:
-		# super().value()
 		val = self._value
-		# if self.flushed: 
-			# raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
+		if self.flushed: 
+			raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
 		if increment != 0:
 			self._value += increment 
 			self.dirty = True
@@ -152,11 +140,11 @@ class PBBaseMetadataPageID(PsuedoBuffIntValue):
 class PBTailMetadataPageID(PsuedoBuffIntValue):
 	def __init__(self, file_handler: FileHandler, page_sub_path: PageID | Literal["catalog"], byte_position: int) -> None:
 		super().__init__(file_handler, page_sub_path, byte_position)
+	
 	def value(self, increment: int = 0) -> TailMetadataPageID:
-		# super().value()
 		val = self._value
-		# if self.flushed:
-		# 	raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
+		if self.flushed:
+			raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
 		if increment != 0:
 			self._value += increment 
 			self.dirty = True
@@ -166,10 +154,9 @@ class PBBaseRID(PsuedoBuffIntValue):
 	def __init__(self, file_handler: FileHandler, page_sub_path: PageID | Literal["catalog"], byte_position: int) -> None:
 		super().__init__(file_handler, page_sub_path, byte_position)
 	def value(self, increment: int = 0) -> BaseRID:
-		# super().value()
 		val = self._value
-		# if self.flushed:
-		# 	raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
+		if self.flushed:
+			raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
 		if increment != 0:
 			self._value += increment 
 			self.dirty = True
@@ -179,10 +166,9 @@ class PBTailRID(PsuedoBuffIntValue):
 	def __init__(self, file_handler: FileHandler, page_sub_path: PageID | Literal["catalog"], byte_position: int) -> None:
 		super().__init__(file_handler, page_sub_path, byte_position)
 	def value(self, increment: int = 0) -> TailRID:
-		# super().value()
 		val = self._value
-		# if self.flushed:
-		# 	raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
+		if self.flushed:
+			raise(Exception("PseudoBuffInt*Value objects can only be flushed once; value() was called after flushing"))
 		if increment != 0:
 			self._value += increment 
 			self.dirty = True
@@ -198,39 +184,43 @@ class PseudoBuffDictValue(Generic[U, V]):
 		self._value = file_handler.read_dict_value(page_sub_path)
 		self.flushed = False
 		self.dirty = False
-		# self._value = file_handler.read_value(page_sub_path, byte_position, "int")
+		
 	def flush(self) -> None:
 		with open(self.page_path, "w+b") as handle:
 			pickle.dump(self._value, handle)
 		handle.close()
 		self.flushed = True
+	
 	def value_get(self) -> dict[U, V]:
-		# if self.flushed:
-		# 	raise(Exception("PseudoBuffDictValues can only be flushed once; tried to get value after flush"))
+		if self.flushed:
+			raise(Exception("PseudoBuffDictValues can only be flushed once; tried to get value after flush"))
 		return self._value
+	
 	def __getitem__(self, key: U) -> V:
-		# if self.flushed:
-		# 	raise(Exception("PseudoBuffDictValues can only be flushed once; tried to get value after flush"))
+		if self.flushed:
+			raise(Exception("PseudoBuffDictValues can only be flushed once; tried to get value after flush"))
 		return self._value[key]
+	
 	def value_assign(self, new_key: U, new_value: V) -> dict[U, V]:
-		# if self.flushed:
-		# 	raise(Exception("PseudoBuffDictValues can only be flushed once; tried to set value after flush"))
+		if self.flushed:
+			raise(Exception("PseudoBuffDictValues can only be flushed once; tried to set value after flush"))
 		self.dirty = True
 		self._value[new_key] = new_value
 		return self._value
+	
 	def __del__(self) -> None:
 		if not self.flushed and self.dirty:
-			#print("I AM A PROBLEMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM " , self.value_get())
 			raise(Exception("unflushed dict buffer value "))
+
 
 class FileHandler:
 	def __init__(self, table: Table) -> None: # path is the database-level path
-		# self.last_base_page_id = self.get_last_base_page_id()
-
 		# NOTE: these next_*_id variables represent the *next* id to be written, not necessarily the last one. the last 
 		# written id is the next_*_id variable minus 1
 		self.table = table
 		self.table_path = os.path.join(table.db_path, self.table.name)
+		self.is_flushed = False
+
 		## FILE INITIALIZATION
 		if not os.path.isfile(self.table_file_path("catalog")): # if the catalog file exists, all other files should also exist..
 			self.initialize_table_files() # catalog, index, page_directory
@@ -239,25 +229,27 @@ class FileHandler:
 			self.initialize_metadata_file(BaseMetadataPageID(1))
 			self.initialize_metadata_file(TailMetadataPageID(1))
 		## END FILE INIT
+		
 		self.next_base_page_id = PBBasePageID(self, "catalog", config.byte_position.catalog.LAST_BASE_PAGE_ID)
 		self.next_tail_page_id = PBTailPageID(self, "catalog", config.byte_position.catalog.LAST_TAIL_PAGE_ID)
 		self.next_base_metadata_page_id = PBBaseMetadataPageID(self, "catalog", config.byte_position.catalog.LAST_BASE_METADATA_PAGE_ID)
 		self.next_tail_metadata_page_id = PBTailMetadataPageID(self, "catalog", config.byte_position.catalog.LAST_TAIL_METADATA_PAGE_ID)
 		self.next_base_rid = PBBaseRID(self, "catalog", config.byte_position.catalog.LAST_BASE_RID)
-		print(f"next base rid initialized to {self.next_base_rid.value()}")
+		#print(f"next base rid initialized to {self.next_base_rid.value()}")
 		self.next_tail_rid = PBTailRID(self, "catalog", config.byte_position.catalog.LAST_TAIL_RID)
+
 		# TODO: populate the offset byte with 0 when creating a new page
 		self.base_offset = PsuedoBuffIntValue(self, BasePageID(self.next_base_page_id.value()), config.byte_position.base_tail.OFFSET) # the current offset is based on the last written page
 		self.base_offset.add_flush_location(BaseMetadataPageID(self.next_base_metadata_page_id.value()), config.byte_position.metadata.OFFSET) # flush the offset in the corresponding metadata file along with the base file
 		self.tail_offset = PsuedoBuffIntValue(self, TailPageID(self.next_tail_page_id.value()), config.byte_position.base_tail.OFFSET) # the current offset is based on the last written page
+	
 	def base_path(self, base_page_id: BasePageID) -> str:
 		return os.path.join(self.table_path, f"base_{base_page_id}")
-		# return os.path.join(config.PATH, self.table.name, f"base_{base_page_id}")
+	
 	def tail_path(self, tail_page_id: TailPageID) -> str:
 		return os.path.join(self.table_path, f"tail_{tail_page_id}")
-		# return os.path.join(config.PATH, self.table.name, f"tail_{tail_page_id}")
+	
 	def metadata_path(self, metadata_page_id: BaseMetadataPageID | TailMetadataPageID) -> str:
-		# assert isinstance(metadata_page_id, BaseMetadataPageID) or isinstance(metadata_page_id, TailMetadataPageID)
 		metadata_page_type = "base" if isinstance(metadata_page_id, BaseMetadataPageID) else "tail"
 		return os.path.join(self.table_path, f"{metadata_page_type}_metadata_{metadata_page_id}")
 
@@ -287,7 +279,6 @@ class FileHandler:
 	def write_position(page_path: str, byte_position: int, value: int) -> bool:
 		with open(page_path, "r+b") as file:
 			file.seek(byte_position)
-			# file.write(struct.pack(config.PACKING_FORMAT_STR, value))
 			file.write(value.to_bytes(config.BYTES_PER_INT, byteorder="big"))
 		file.close()
 		return True
@@ -309,6 +300,7 @@ class FileHandler:
 			ret = int.from_bytes(file.read(8), "big")
 		file.close()
 		return ret
+	
 	def read_dict_value(self, page_sub_path: Literal["page_directory", "indices"]) -> dict:
 		page_path = self.page_path(page_sub_path)
 		ret: dict
@@ -316,7 +308,6 @@ class FileHandler:
 			ret = pickle.load(handle)
 		handle.close()
 		return ret
-
 
 	@staticmethod
 	def is_valid_table_file_name(name: Any) -> TypeGuard[Literal["catalog", "page_directory", "indices"]]:
@@ -332,7 +323,6 @@ class FileHandler:
 		else:
 			raise(Exception(f"unexpected page_sub_path {page_sub_path}"))
 
-
 	# reads the full base or tail page written to disk. will follow metadata pointer for metadata as well
 	# set projected_columns_index to None to get all columns.
 	# returns None for any pages not requested
@@ -346,11 +336,12 @@ class FileHandler:
 		val = metadata_buff.value()
 		# assert isMetadataPageID(val)
 		assert isinstance(val, BaseMetadataPageID) or isinstance(val, TailMetadataPageID)
+
 		metadata_path = self.metadata_path(val)
 		path = self.page_id_to_path(page_id)
 		if not os.path.isfile(metadata_path) or not os.path.isfile(path):
 			return None
-
+		
 		offset = self.read_int_value(page_id, config.byte_position.base_tail.OFFSET)
 		# read selected metadata
 		with open(metadata_path, "rb") as metadata_file:
@@ -588,12 +579,12 @@ class FileHandler:
 		self.next_tail_rid.flush()
 		self.base_offset.flush()
 		self.tail_offset.flush()
+		self.is_flushed = True
 
 	def __del__(self) -> None:
-		pass
-		# self.flush()
-		#print(f"DELETING FILE HANDLER PATH {self.table_path}")
-
+		if not self.is_flushed:
+			raise Exception("File Handler of table: %s was not flushed", self.table)
+		
 
 PageDirectory = dict[int, PageDirectoryEntry]
 
@@ -789,13 +780,10 @@ class BufferedPage:
 
 
 class BufferedRecord:
-	# def unpin(self) -> None:
-	# 	print(f"the pin count is now {list(map(lambda e: e.pin_count if e is not None else None, self.bufferpool.entries))}")
 	def __del__(self) -> None:
 		self.bufferpool.change_pin_count(self.metadata_buff_indices + self.data_buff_indices, -1)
 		pass
-	def __init__(self, bufferpool: Bufferpool, table: Table, metadata_buff_indices: List[BufferpoolIndex], data_buff_indices: List[BufferpoolIndex | None], record_offset: int, record_id: RID, projected_columns_index: List[Literal[0, 1]]):
-		# self.initialized = False
+	def __init__(self, bufferpool: Bufferpool, table: Table, buff_indices: List[BufferpoolIndex], record_offset: int, record_id: RID, projected_columns_index: List[Literal[0, 1]]):
 		self.bufferpool = bufferpool
 		self.metadata_buff_indices = metadata_buff_indices
 		self.data_buff_indices = data_buff_indices
@@ -803,7 +791,16 @@ class BufferedRecord:
 		self.record_offset = record_offset
 		self.record_id = record_id
 		self.projected_columns_index = projected_columns_index
-		bufferpool.change_pin_count(metadata_buff_indices + data_buff_indices, +1) # increment pin counts of relevant bufferpool frames
+		bufferpool.change_pin_count(buff_indices, +1) # increment pin counts of relevant bufferpool frames
+
+	def add_buff_idx(self, buff_idx: BufferpoolIndex) -> None:
+		self.buff_indices.append(buff_idx)
+		self.bufferpool[buff_idx].pin_count += 1 # will be decremented later because it was addded to base_buff_indices
+
+	def unpin_buff_indices(self, buff_indices: List[BufferpoolIndex]) -> None:
+		for buff_idx in buff_indices:
+			self.bufferpool[buff_idx].pin_count -= 1
+			self.buff_indices.remove(buff_idx)
 
 	def get_value(self) -> Record:
 		num_cols = len(self.projected_columns_index) # number of data_cols
@@ -829,11 +826,9 @@ class BufferedRecord:
 
 		def get_no_none_check(col_idx: RawIndex, record_offset: int) -> int:
 			return helper.unpack_data(helper.not_null(all_cols[col_idx]).data, record_offset)
+		
 		def get_check_for_none(col_idx: RawIndex, record_offset: int) -> int | None:
-			# val = all_cols[col_idx][record_offset]
-			# val = int.from_bytes(all_cols[col_idx].data[record_offset:record_offset+config.BYTES_PER_INT], byteorder="big")
 			val = get_no_none_check(col_idx, record_offset)
-			# # #print("getting checking null")
 			if val == 0:
 				# breaking an abstraction barrier for convenience right now. TODO: fix?
 				thing = helper.unpack_data(helper.not_null(all_cols[config.NULL_COLUMN]).data, record_offset)
@@ -887,15 +882,11 @@ class BufferedRecord:
 				return None
 			return BaseRID(rid) if rid < self.table.file_handler.next_tail_rid.value() else TailRID(rid)
 		return Record(FullMetadata(rid_type(rid), timestamp, rid_type(indirection_column), schema_encoding, null_col, rid_type(base_rid)), is_base_page, *columns)
-				
-class Bufferpool:
-	# buffered_physical_pages: list[Buffered[PhysicalPage]] = []
-	# page_to_commit: typing.Annotated[list[PhysicalPage], self.num_raw_columns] = []
 
-	# buffered_physical_pages: dict[int, Buffered[PhysicalPage]] = {}
+
+class Bufferpool:
 	TProjected_Columns = List[Literal[0, 1]]
 	def __init__(self, path: str) -> None: 
-
 		self.entries: Annotated[List[BufferpoolEntry | None], config.BUFFERPOOL_SIZE] = [None] * config.BUFFERPOOL_SIZE
 		self.path = path
 		self.curr_clock_hand = 0
@@ -936,7 +927,6 @@ class Bufferpool:
 		self.entries[key] = item
 
 	def close_bufferpool(self) -> None:
-		
 		for i in [BufferpoolIndex(_) for _ in range(config.BUFFERPOOL_SIZE)]:
 			if self.entries[i]!=None:
 				if self[i].dirty_bit==True:
@@ -944,11 +934,9 @@ class Bufferpool:
 					self.write_to_disk(table, i)
 				self.change_bufferpool_entry(None,i)
 				# bufferpool_entry=BufferpoolEntry(0, None, False,  None,  None,  None,  None)
-		
-
+	
 	def change_bufferpool_entry(self, entry: BufferpoolEntry | None, buff_idx: BufferpoolIndex) -> None:
 		self[buff_idx] = entry
-
 
 	def get_page_type(self, buff_idx: BufferpoolIndex) -> TPageType:
 		page_id = self[buff_idx].physical_page_id
@@ -975,11 +963,7 @@ class Bufferpool:
 			case "tail_metadata":
 				return TailMetadataPageID(page_id)
 
-
-
-	def change_pin_count(self, buff_indices: Sequence[BufferpoolIndex | None], change: int) -> None:
-		# print(f"changing pin count of {buff_indices} by {change}...")
-		# print(f"pin counts WERE {list(map(lambda e: e.pin_count if e is not None else None, self.entries))}")
+	def change_pin_count(self, buff_indices: list[BufferpoolIndex], change: int) -> None:
 		for idx in buff_indices:
 			if idx is not None:
 				self[idx].pin_count += change
@@ -992,7 +976,6 @@ class Bufferpool:
 		return rid
 
 	def insert_tail_record(self, table: Table, metadata: WriteSpecifiedTailMetadata, *columns: int | None) -> int:
-		print(f"inserting tail record mjtadata {metadata} and columns {columns}")
 		return table.file_handler.insert_tail_record(metadata, *columns)
 
 
@@ -1013,7 +996,6 @@ class Bufferpool:
 		metadata_buff_indices: List[BufferpoolIndex | TNOT_FOUND] = [-1] * config.NUM_METADATA_COL
 		#column_list = [None] * len(projected_columns_index)
 
-		
 		for i in [BufferpoolIndex(_) for _ in range(config.BUFFERPOOL_SIZE)]:
 			if self.maybe_get_entry(i) is None:
 				continue
@@ -1042,7 +1024,6 @@ class Bufferpool:
 		page_res = self.is_page_in_bufferpool(table, page_id, projected_columns_index)
 		return BufferpoolRecordSearchResult(page_res.found, page_res.data_buff_indices, page_res.metadata_buff_indices, self.rid_to_offset(table, rid))
 
-
 	def delete_nth_record(self, table : Table, page_id: PageID, offset :int) -> bool:
 		bitmask = table.ith_total_col_shift(config.RID_COLUMN)
 		null_column_marked=False
@@ -1055,77 +1036,81 @@ class Bufferpool:
 				entry.physical_page.data[offset:offset+8] = int.to_bytes(0, config.BYTES_PER_INT, "big")
 				rid_column_marked=True
 		return rid_column_marked and null_column_marked
-				
+	
 	# updates a column of a specified record in place.
 	# returns True on success
 	def update_col_record_inplace(self, table: Table, rid: RID, raw_col_idx: RawIndex, new_value: int) -> bool:
 		is_metadata = raw_col_idx < config.NUM_METADATA_COL
 		proj_data_idx: List[Literal[0, 1]] = [0] * table.num_columns
 		proj_metadata_idx: List[Literal[0, 1]] = [0] * config.NUM_METADATA_COL
+		assert rid is not None
 		page_dir_entry = table.page_directory_buff[rid]
-		buff_idx: BufferpoolIndex | Literal[-1] = -1 
-		desired_page_type = "base"
+		buff_idx: BufferpoolIndex | Literal[-1] = -1
+
+		desired_page_type = "base" if isinstance(rid, BaseRID) else "tail"
+
 		if is_metadata: # this is a metadata column
 			proj_metadata_idx[raw_col_idx] = 1
 			desired_page_type += "_metadata" # base_metadata type
 		else:
 			proj_data_idx[raw_col_idx] = 1
 			# desired_page_type remains as "base"
+		
 		# col_idx = raw_col_idx.toDataIndex()
 
-		## check if that column is in the bufferpool already
-		for i in [BufferpoolIndex(_) for _ in range(config.BUFFERPOOL_SIZE)]: # search the entire bufferpool for columns
-			if self.maybe_get_entry(i) is None:
-				continue
-			if self[i].physical_page_id == page_dir_entry.page_id and type(self[i].physical_page_id) == type(page_dir_entry.page_id):
-				raw_idx = self[i].physical_page_index
-				assert raw_idx is not None, "non None in ids_of_physical_pages but None in index_of_physical_page_in_page?"
-				# data_idx = raw_idx.toDataIndex()
-				if raw_idx == raw_col_idx: # is the column we want?
-					buff_idx = i
-					break # found the column. since we are only looking for one column, we can break here
+		# ## check if that column is in the bufferpool already
+		# for i in [BufferpoolIndex(_) for _ in range(config.BUFFERPOOL_SIZE)]: # search the entire bufferpool for columns
+		# 	if self.maybe_get_entry(i) is None:
+		# 		continue
+		# 	if self[i].physical_page_id == page_dir_entry.page_id and type(self[i].physical_page_id) == type(page_dir_entry.page_id):
+		# 		raw_idx = self[i].physical_page_index
+		# 		assert raw_idx is not None, "non None in ids_of_physical_pages but None in index_of_physical_page_in_page?"
+		# 		# data_idx = raw_idx.toDataIndex()
+		# 		if raw_idx == raw_col_idx: # is the column we want?
+		# 			buff_idx = i
+		# 			break # found the column. since we are only looking for one column, we can break here
 		
+		
+
 		## if the column is not in the bufferpool, bring it in
-		if buff_idx == -1:
-			read_res = table.file_handler.read_projected_cols_of_page(page_dir_entry.page_id, proj_data_idx)
-			assert read_res is not None
-			metadata_physical_pages, data_physical_pages = read_res
-			slots = self.evict_n_slots(1) # l
-			assert slots is not None and len(slots) == 1
-			physical_page = metadata_physical_pages[raw_col_idx] if is_metadata else data_physical_pages[raw_col_idx.toDataIndex()]
-			assert physical_page is not None
-			buff_idx = slots[0]
-			self[buff_idx] = BufferpoolEntry(0, physical_page, False, page_dir_entry.page_id, raw_col_idx, table)
-			# self.change_bufferpool_entry(BufferpoolEntry(0, ))
+		# if buff_idx == -1:
+		# 	read_res = table.file_handler.read_projected_cols_of_page(page_dir_entry.page_id, proj_data_idx, proj_metadata_idx)
+		# 	assert read_res is not None
+		# 	metadata_physical_pages, data_physical_pages = read_res
+		# 	slots = self.evict_n_slots(1) # l
+		# 	assert slots is not None and len(slots) == 1
+		# 	physical_page = metadata_physical_pages[raw_col_idx] if is_metadata else data_physical_pages[raw_col_idx.toDataIndex()]
+		# 	assert physical_page is not None
+		# 	buff_idx = slots[0]
+		# 	self[buff_idx] = BufferpoolEntry(0, physical_page, False, page_dir_entry.page_id, raw_col_idx, table)
+		# 	# self.change_bufferpool_entry(BufferpoolEntry(0, ))
 
-		## now, we can actually update the value now that we know it's in the bufferpool
-		self[buff_idx].physical_page.data[page_dir_entry.offset:page_dir_entry.offset+config.BYTES_PER_INT] = helper.encode(new_value) 
-		self[buff_idx].dirty_bit = True # the value has been changed, it should be dirty
+		page_id = self.rid_to_page_id(table, rid)
+		indexes = self.get_page(table, page_id, proj_data_idx)
+		page_offset = self.rid_to_offset(table, rid)
+		
+		assert indexes is not None	# should this be an assert???
 
+		# now, we can actually update the value now that we know it's in the bufferpool
+		self[indexes[raw_col_idx]].physical_page.data[page_offset : page_offset+config.BYTES_PER_INT] = helper.encode(new_value) 
+		self[indexes[raw_col_idx]].dirty_bit = True # the value has been changed, it should be dirty
 		return True
-
-
 	
 	def update_nth_record(self, page_id: PageID, offset: int, col_idx: int, new_value: int) -> bool:
-
 		record_column_entry = None
-
 		for entry in self.entries:
 			if entry is not None and entry.physical_page_id == page_id and entry.physical_page_index == col_idx:
 				record_column_entry = entry
 		
 		if record_column_entry is None: 
 			return False
-
 		record_column_entry.physical_page.data[offset: offset+8] = int.to_bytes(new_value, config.BYTES_PER_INT,"big")
-
 		return True
-
 
 	def get_updated_col(self, table: Table, record: Record, col_idx: DataIndex) -> int | None:
 		if record.metadata.rid == None:
 			print("deleted record")
-			return None # deleted record.
+			return None # deleted record
 		# table: 'Table' = next(table for table in self.tables if table.name == table_name)
 		desired_col: int | None = record[col_idx]
 		schema_encoding = record.metadata.schema_encoding
@@ -1189,6 +1174,7 @@ class Bufferpool:
 				curr_record = record
 			desired_col = curr_record[col_idx]
 		return desired_col
+	
 	def get_version_record(self, table: Table, record_id: RID, projected_columns_index: list[Literal[0] | Literal[1]], relative_version: int) -> Record | None:
 		table.file_handler.flush()
 		# table: Table = next(table for table in self.tables if table.name == table_name)
@@ -1265,7 +1251,6 @@ class Bufferpool:
 	def get_page(self, table: Table, page_id: BaseTailPageID, projected_columns_index: list[Literal[0] | Literal[1]]) -> BufferedPage | None: # type: ignore[return]
 		requested_columns: list[DataIndex] = [DataIndex(i) for i, binary_item in enumerate(projected_columns_index) if binary_item == 1]
 		found, data_buff_indices, metadata_buff_indices = self.is_page_in_bufferpool(table, page_id, projected_columns_index)
-		#  = t.found, t.data_buff_indices, t.metadata_buff_indices
 		assert len(data_buff_indices) == table.num_columns
 		assert len(metadata_buff_indices) == config.NUM_METADATA_COL
 
@@ -1374,13 +1359,10 @@ class Bufferpool:
 			evicted_buff_idx.append(evicted)
 		return evicted_buff_idx
 
-
 	def remove_from_bufferpool(self,index: BufferpoolIndex) -> None:
 		self[index] = None
 
 	def write_to_disk(self, table: Table, index: BufferpoolIndex) -> None:
-		# table_name = self.table_names[index]
-		# table: 'Table' = next(table for table in self.tables if table.name == table_name)
 		page_id = self[index].physical_page_id
 		physical_page_index = self[index].physical_page_index
 		assert page_id is not None
