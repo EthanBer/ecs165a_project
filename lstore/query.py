@@ -19,7 +19,6 @@ class Query:
     Queries that succeed should return the result or True
     Any query that crashes (due to exceptions) should return False
     """
-
     def __init__(self, table: Table):
         self.table = table
         self.db_bpool = table.db_bpool  # The bufferpool is the same for every table, because there is only one
@@ -31,6 +30,8 @@ class Query:
     # Returns True upon succesful deletion
     # Return False if record doesn't exist or is locked due to 2PL
     """
+
+
     """
     def delete(self, primary_key: int) -> bool:
         
@@ -115,12 +116,12 @@ class Query:
         # pass
     """
 
+
     """
     # Insert a record with specified columns
     # Return True upon succesful insertion
     # Returns False if insert fails for whatever reason
     """
-
     def insert(self, *columns: int | None) -> bool:
         schema_encoding = 0b0
         timestamp = int(time.time())
@@ -150,6 +151,7 @@ class Query:
 
         return True
 
+
     # gets the most up-to-date column value for a record.
     def get_updated_col(self, record: Record, col_idx: DataIndex) -> int | None:
         return self.db_bpool.get_updated_col(self.table, record, DataIndex(col_idx))
@@ -163,7 +165,6 @@ class Query:
     # Returns False if record locked by TPL
     # Assume that select will never be called on a key that doesn't exist
     """
-    
     def select(self, search_key: int, search_key_index: DataIndex,
                projected_columns_index: list[Literal[0] | Literal[1]], use_idx: bool = False) -> list[Record]:
         # search_key_index = DataIndex(search_key_index)
@@ -224,6 +225,7 @@ class Query:
         # self.table.page_ranges.
         return ret
 
+
     """
     # Read matching record with specified search key
     # :param search_key: the value you want to search based on
@@ -234,7 +236,6 @@ class Query:
     # Returns False if record locked by TPL
     # Assume that select will never be called on a key that doesn't exist
     """
-    
     # def select_version(self, search_key: int, search_key_index: DataIndex, projected_columns_index: list[Literal[0, 1]],
     #                    relative_version: int) -> list[Record] | Literal[False]:
     #     # search_key_index = DataIndex(search_key_index)
@@ -321,12 +322,13 @@ class Query:
     #     # self.table.page_ranges.
     #     return ret
 
+
+
     """
     # Update a record with specified key and columns
     # Returns True if update is succesful
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
-    """
-    
+    """    
     # TODO finish
     """
     """
@@ -337,7 +339,6 @@ class Query:
         elif delete == True:
             raise(Exception("not implemented"))
 
-        
         assert len(
             columns) == self.table.num_columns, f"len(columns) must be equal to number of columns in table; argument had length {len(columns)} but expected {self.table.num_columns} length, cols was {columns}"
         if len(columns) != self.table.num_columns:
@@ -506,6 +507,7 @@ class Query:
         #     s += self.table.get_record_by_rid(record.indirection_column)[aggregate_column_index]
         return s
 
+
     """
     :param start_range: int         # Start of the key range to aggregate 
     :param end_range: int           # End of the key range to aggregate 
@@ -544,6 +546,7 @@ class Query:
     #     else:
     #         return sum(valid_numbers)
 
+
     """
     incremenets one column of the record
     this implementation should work if your select and update queries already work
@@ -552,7 +555,6 @@ class Query:
     # Returns True is increment is successful
     # Returns False if no record matches key or if target record is locked by 2PL.
     """
-
     def increment(self, key: int, column: DataIndex) -> bool:
         r = self.select(key, self.table.key_index, [1] * self.table.num_columns)[0]
         if r is not False:
